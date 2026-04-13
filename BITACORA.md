@@ -524,7 +524,9 @@ La ruta interna se reescribe eliminando el prefijo `/api`: `/api/cats/1` → `/c
 - `JwtAuthFilter` usa `@ServerRequestFilter` de RESTEasy Reactive (devuelve `Uni<Response>`)
 - `ProxyService` usa `Vert.x WebClient` (no los REST clients de Quarkus) para poder hacer
   proxy genérico sin definir cada endpoint individualmente
-- **Pendiente**: soporte multipart para `POST /api/cats/{id}/images` (upload de imágenes)
+- El proxy pasa `byte[]` crudos con el `Content-Type` original (incluido el multipart boundary),
+  haciendo el forwarding transparente a cualquier tipo de body (JSON, multipart, etc.)
+- `GatewayResource` usa `@Consumes(WILDCARD)` en POST y PUT para no rechazar multipart
 
 ---
 
@@ -653,7 +655,7 @@ user-service      ✅
 auth-service      ✅
 storage-service   ✅
 cat-service       ✅
-gateway-service   ✅ (proxy + JWT filter, pendiente soporte multipart)
+gateway-service   ✅
 ban-service       📋 (baneo temporal/permanente, desbaneo via @Scheduled)
 adoption-service  📋 (proceso adopción, historial, reportes)
 ```
