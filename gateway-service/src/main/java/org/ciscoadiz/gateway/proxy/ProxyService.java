@@ -27,7 +27,7 @@ public class ProxyService {
     String storageServiceUrl;
 
     public Uni<Response> proxy(String method, String path,
-                               String body, String authHeader,
+                               byte[] body, String authHeader,
                                String contentType) {
         String targetUrl = resolveTarget(path);
         if (targetUrl == null) {
@@ -51,7 +51,7 @@ public class ProxyService {
         }
 
         Uni<io.vertx.mutiny.ext.web.client.HttpResponse<Buffer>> response;
-        if (body != null && !body.isEmpty()) {
+        if (body != null && body.length > 0) {
             response = request.sendBuffer(Buffer.buffer(body));
         } else {
             response = request.send();
@@ -59,7 +59,7 @@ public class ProxyService {
 
         return response.onItem().transform(r ->
                 Response.status(r.statusCode())
-                        .entity(r.bodyAsString())
+                        .entity(r.body().getBytes())
                         .header("Content-Type", r.getHeader("Content-Type"))
                         .build()
         );

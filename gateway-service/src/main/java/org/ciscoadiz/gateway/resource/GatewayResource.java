@@ -5,6 +5,7 @@ import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.HttpHeaders;
+import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import org.ciscoadiz.gateway.proxy.ProxyService;
 
@@ -29,9 +30,10 @@ public class GatewayResource {
 
     @POST
     @Path("/{path: .+}")
+    @Consumes(MediaType.WILDCARD)
     public Uni<Response> post(@PathParam("path") String path,
                               @Context HttpHeaders headers,
-                              String body) {
+                              byte[] body) {
         return proxyService.proxy(
                 "POST",
                 "/api/" + path,
@@ -43,9 +45,10 @@ public class GatewayResource {
 
     @PUT
     @Path("/{path: .+}")
+    @Consumes(MediaType.WILDCARD)
     public Uni<Response> put(@PathParam("path") String path,
                              @Context HttpHeaders headers,
-                             String body) {
+                             byte[] body) {
         return proxyService.proxy(
                 "PUT",
                 "/api/" + path,
