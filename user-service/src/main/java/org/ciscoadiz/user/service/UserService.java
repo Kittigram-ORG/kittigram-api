@@ -1,0 +1,88 @@
+package org.ciscoadiz.user.service;
+
+import io.quarkus.elytron.security.common.BcryptUtil;
+import io.quarkus.hibernate.reactive.panache.common.WithSession;
+import io.quarkus.hibernate.reactive.panache.common.WithTransaction;
+import io.smallrye.mutiny.Multi;
+import io.smallrye.mutiny.Uni;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import org.ciscoadiz.user.dto.UserCreateRequest;
+import org.ciscoadiz.user.dto.UserResponse;
+import org.ciscoadiz.user.dto.UserUpdateRequest;
+import org.ciscoadiz.user.entity.User;
+import org.ciscoadiz.user.entity.UserStatus;
+import org.ciscoadiz.user.exception.UserNotFoundException;
+import org.ciscoadiz.user.mapper.UserMapper;
+import org.ciscoadiz.user.repository.UserRepository;
+
+import java.util.List;
+
+@ApplicationScoped
+public class UserService {
+
+    @Inject
+    UserRepository userRepository;
+    @Inject
+    UserMapper userMapper;
+
+    @WithSession
+    public Uni<UserResponse> findByEmail(String email) {
+        return userRepository.findByEmail(email)
+                .onItem()
+                .ifNull()
+                .failWith(() -> new UserNotFoundException(email))
+                .onItem().transform(userMapper::toResponse);
+    }
+
+    public Multi<UserResponse> findAllActiveUsers() {
+        return Multi.createFrom().uni(
+                        Uni.createFrom().deferred(() ->
+                                userRepository.findAllActiveUsers()
+                                        .collect().asList()
+                        )
+                ).flatMap(list -> Multi.createFrom().iterable(list))
+                .onItem().transform(userMapper::toResponse);
+    }
+
+    @WithTransaction
+    public Uni<UserResponse> createUser(UserCreateRequest request) {
+        return userRepository.existsByEmail(request.email())
+                .onItem().transformToUni(exists -> {
+                    if (exists) {
+                        return Uni.createFrom()
+                                .failure(new IllegalArgumentException(request.email()));
+                    }
+                    var hashedPassword = BcryptUtil.bcryptHash(request.password());
+                    var user = userMapper.toEntity(request, hashedPassword);
+                    return userRepository.persist(user);
+                })
+                .onItem().transform(userMapper::toResponse);
+    }
+
+    @WithTransaction
+    public Uni<UserResponse> updateUser(String email, UserUpdateRequest request) {
+        return userRepository.findByEmail(email)
+                .onItem().ifNull().failWith(() -> new UserNotFoundException(email)).onItem().transformToUni(user -> {
+                    userMapper.updateEntity(user, request);
+                    return userRepository.persist(user);
+                }).onItem().transform(userMapper::toResponse);
+    }
+
+    @WithTransaction
+    public Uni<UserResponse> deactivateUser(String email) {
+        return userRepository.findByEmail(email)
+                .onItem().ifNull().failWith(() -> new UserNotFoundException(email)).onItem().transformToUni(user -> {
+                    user.status = UserStatus.Inactive;
+                    return userRepository.persist(user);
+                }).onItem().transform(userMapper::toResponse);
+    }
+
+    @WithTransaction
+    public Uni<UserResponse> activateUser(String email) {
+        return userRepository.findByEmail(email).onItem().ifNull().failWith(() -> new UserNotFoundException(email)).onItem().transformToUni(user -> {
+            user.status = UserStatus.Active;
+            return userRepository.persist(user);
+        }).onItem().transform(userMapper::toResponse);
+    }
+}
