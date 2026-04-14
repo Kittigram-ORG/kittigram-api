@@ -26,10 +26,14 @@ Kittigram es un portal donde los usuarios pueden subir perfiles de gatos para ad
 8082  → auth-service HTTP
 8083  → storage-service HTTP
 8084  → cat-service HTTP
+8085  → notification-service HTTP
+8008  → Kafka UI (provectuslabs/kafka-ui)
 9000  → MinIO API S3
 9001  → MinIO consola web
 9090  → user-service gRPC server
 9091  → auth-service gRPC server (no lo usa realmente)
+9092  → Kafka broker
+2181  → Zookeeper
 ```
 
 ### Stack tecnológico
@@ -39,8 +43,9 @@ Kittigram es un portal donde los usuarios pueden subir perfiles de gatos para ad
 - **ORM**: Hibernate Reactive + Panache
 - **REST**: Quarkus REST (RESTEasy Reactive)
 - **gRPC**: Quarkus gRPC
-- **Mensajería**: SmallRye Reactive Messaging
+- **Mensajería**: SmallRye Reactive Messaging + Apache Kafka (confluentinc/cp-kafka:7.5.0)
 - **JWT**: SmallRye JWT
+- **Email**: Quarkus Mailer (MailHog en dev)
 - **Imágenes**: Quarkiverse Amazon S3 + MinIO (dev) / Cloudflare R2 (prod)
 - **Contenedores**: Jib (sin Dockerfile)
 
@@ -51,13 +56,15 @@ Kittigram es un portal donde los usuarios pueden subir perfiles de gatos para ad
 ```
 kittigram/
 ├── pom.xml                  ← padre agregador
-├── docker-compose.yml       ← PostgreSQL + MinIO
+├── docker-compose.yml       ← PostgreSQL + MinIO + Kafka + Zookeeper + Kafka UI
 ├── init.sql                 ← CREATE SCHEMA users, auth, cats
 ├── BITACORA.md
 ├── user-service/
 ├── auth-service/
 ├── storage-service/
-└── cat-service/
+├── cat-service/
+├── gateway-service/
+└── notification-service/
 ```
 
 ### pom.xml raíz (padre)
@@ -75,6 +82,7 @@ kittigram/
     <module>storage-service</module>
     <module>cat-service</module>
     <module>gateway-service</module>
+    <module>notification-service</module>
 </modules>
 ```
 
@@ -202,6 +210,8 @@ No añadir `@WithSession` si la sesión ya está abierta en el Service llamante.
 - `quarkus-hibernate-reactive-panache`
 - `quarkus-reactive-pg-client`
 - `quarkus-messaging`
+- `quarkus-messaging-kafka` (productor Kafka)
+- `quarkus-mailer`
 - `quarkus-grpc`
 - `quarkus-elytron-security-common` (BcryptUtil para hash de passwords)
 - `quarkus-smallrye-jwt` (verificación JWT)
@@ -209,7 +219,7 @@ No añadir `@WithSession` si la sesión ya está abierta en el Service llamante.
 
 **Entidades**:
 - `User` → tabla `users.users`
-  - id, email, passwordHash, name, surname, birthdate, status, createdAt, updatedAt
+  - id, email, passwordHash, name, surname, birthdate, status, activationToken, createdAt, updatedAt
   - `UserStatus`: Active, Inactive, Banned
   - `@PrePersist` y `@PreUpdate` para timestamps
 
@@ -217,6 +227,7 @@ No añadir `@WithSession` si la sesión ya está abierta en el Service llamante.
 ```
 entity/User.java
 entity/UserStatus.java
+event/UserRegisteredEvent.java  ← record publicado a Kafka
 repository/UserRepository.java
 service/UserService.java
 mapper/UserMapper.java
@@ -248,6 +259,11 @@ service UserService {
 }
 ```
 - `@WithSession` en los métodos del `UserGrpcService`
+
+**Eventos Kafka**:
+- `user-registered` (outgoing): publicado en `createUser()`. Payload: `UserRegisteredEvent(userId, email, name, activationToken)`
+- Serializer: `ObjectMapperSerializer` (JSON)
+- Config: `mp.messaging.outgoing.user-registered.*`
 
 **Notas importantes**:
 - La tabla se llama `users` (no `User` para evitar conflicto con palabra reservada en PostgreSQL)
@@ -492,6 +508,48 @@ quarkus.rest-client.storage-service.url=${STORAGE_SERVICE_URL:http://localhost:8
 
 ---
 
+### notification-service
+**Puerto**: 8085
+**Sin BD** (solo envía emails)
+
+**Dependencias**:
+- `quarkus-rest-jackson`
+- `quarkus-messaging-kafka` (consumidor Kafka)
+- `quarkus-mailer`
+- `quarkus-container-image-jib`
+
+**Estructura**:
+```
+consumer/UserRegisteredConsumer.java  ← @Incoming("user-registered")
+event/UserRegisteredEvent.java        ← mismo record que user-service
+```
+
+**Flujo**:
+1. `user-service` publica `UserRegisteredEvent` en topic `user-registered`
+2. `notification-service` consume el mensaje vía `@Incoming("user-registered")`
+3. Deserializa con `ObjectMapper` (llega como `String`)
+4. Envía email HTML de activación via `ReactiveMailer`
+
+**Configuración Kafka**:
+```properties
+kafka.bootstrap.servers=${KAFKA_HOST:localhost}:${KAFKA_PORT:9092}
+mp.messaging.incoming.user-registered.connector=smallrye-kafka
+mp.messaging.incoming.user-registered.topic=user-registered
+mp.messaging.incoming.user-registered.value.deserializer=org.apache.kafka.common.serialization.StringDeserializer
+mp.messaging.incoming.user-registered.group.id=notification-service
+```
+
+**Email de activación**:
+- Subject: "Activa tu cuenta en Kittigram 🐱"
+- Contiene enlace: `http://localhost:8080/api/users/activate?token={activationToken}`
+- MailHog en dev (puerto 1025 SMTP, 8025 web UI)
+
+**Notas importantes**:
+- El mensaje Kafka llega como `String` (no como el tipo directamente) → se deserializa manualmente con `ObjectMapper`
+- El `notification-service` tiene su propia copia del record `UserRegisteredEvent` (sin dependencias entre módulos Maven)
+
+---
+
 ### gateway-service
 **Puerto**: 8080 (punto de entrada público)
 **Sin BD**
@@ -596,37 +654,12 @@ chore: project scaffold
 
 ## docker-compose.yml
 
-```yaml
-services:
-  postgres:
-    image: postgres:16
-    environment:
-      POSTGRES_USER: kittigram
-      POSTGRES_PASSWORD: kittigram
-      POSTGRES_DB: kittigram
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+Incluye: PostgreSQL, MinIO, MailHog, Zookeeper, Kafka, Kafka UI.
 
-  minio:
-    image: minio/minio:latest
-    command: server /data --address ":9000" --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: kittigram
-      MINIO_ROOT_PASSWORD: kittigram123
-      MINIO_DEFAULT_BUCKETS: kittigram
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    volumes:
-      - minio_data:/data
-
-volumes:
-  postgres_data:
-  minio_data:
-```
+Kafka config relevante:
+- `KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092` → para conexiones desde host
+- `KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1` → cluster de un solo nodo
+- Kafka UI en `http://localhost:8008` (puerto interno 8080 mapeado a 8008 para evitar conflicto con gateway)
 
 ## init.sql
 
@@ -649,6 +682,7 @@ CREATE SCHEMA IF NOT EXISTS cats;
 6. **`ban-service`** → sistema de baneo temporal/permanente con desbaneo automático via `@Scheduled`
 7. **`adoption-service`** → proceso de adopción, historial, reportes
 8. **`docker-compose.yml` de producción** → con todos los servicios
+9. **Gateway: rutas de notification-service** → exponer `GET /api/users/activate` (ya está en user-service)
 
 ### Deuda técnica
 - `@JsonProperty` en todos los records de todos los servicios para deserialización correcta
@@ -657,13 +691,14 @@ CREATE SCHEMA IF NOT EXISTS cats;
 
 ### Servicios futuros planificados
 ```
-user-service      ✅
-auth-service      ✅
-storage-service   ✅
-cat-service       ✅
-gateway-service   ✅
-ban-service       📋 (baneo temporal/permanente, desbaneo via @Scheduled)
-adoption-service  📋 (proceso adopción, historial, reportes)
+user-service           ✅
+auth-service           ✅
+storage-service        ✅
+cat-service            ✅
+gateway-service        ✅
+notification-service   ✅ (email activación via Kafka)
+ban-service            📋 (baneo temporal/permanente, desbaneo via @Scheduled)
+adoption-service       📋 (proceso adopción, historial, reportes)
 ```
 
 ---
@@ -757,3 +792,8 @@ docker exec -it kittigram-postgres-1 psql -U kittigram -d kittigram -c "\dt cats
 | MINIO_DEFAULT_BUCKETS | kittigram | Nombre del bucket |
 | STORAGE_SERVICE_URL | http://localhost:8083 | URL del storage-service |
 | USER_SERVICE_HOST | localhost | Host del user-service (para gRPC) |
+| KAFKA_HOST | localhost | Host del broker Kafka |
+| KAFKA_PORT | 9092 | Puerto del broker Kafka |
+| MAIL_HOST | localhost | Host SMTP (MailHog en dev) |
+| MAIL_PORT | 1025 | Puerto SMTP |
+| MAIL_FROM | kittigram@ciscoadiz.org | Remitente de los emails |
