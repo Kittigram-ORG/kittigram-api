@@ -12,6 +12,7 @@ import org.ciscoadiz.user.dto.UserResponse;
 import org.ciscoadiz.user.dto.UserUpdateRequest;
 import org.ciscoadiz.user.entity.User;
 import org.ciscoadiz.user.entity.UserStatus;
+import org.ciscoadiz.user.exception.InvalidTokenException;
 import org.ciscoadiz.user.exception.UserNotFoundException;
 import org.ciscoadiz.user.mapper.UserMapper;
 import org.ciscoadiz.user.repository.UserRepository;
@@ -84,5 +85,18 @@ public class UserService {
             user.status = UserStatus.Active;
             return userRepository.persist(user);
         }).onItem().transform(userMapper::toResponse);
+    }
+
+    @WithTransaction
+    public Uni<UserResponse> activateByToken(String token) {
+        return userRepository.findByActivationToken(token)
+                .onItem().ifNull()
+                .failWith(() -> new InvalidTokenException("Invalid or expired activation token"))
+                .onItem().transformToUni(user -> {
+                    user.status = UserStatus.Active;
+                    user.activationToken = null;
+                    return userRepository.persist(user);
+                })
+                .onItem().transform(userMapper::toResponse);
     }
 }

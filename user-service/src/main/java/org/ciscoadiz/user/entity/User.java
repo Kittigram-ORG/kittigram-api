@@ -23,6 +23,8 @@ public class User extends PanacheEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     public UserStatus status;
+    @Column(unique = true)
+    public String activationToken;
     @Column(nullable = false, updatable = false )
     public LocalDateTime createdAt;
     @Column(nullable = false)

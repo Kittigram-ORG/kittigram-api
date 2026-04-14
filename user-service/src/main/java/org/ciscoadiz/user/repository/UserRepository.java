@@ -1,6 +1,7 @@
 package org.ciscoadiz.user.repository;
 
 import io.quarkus.hibernate.reactive.panache.PanacheRepository;
+import io.quarkus.hibernate.reactive.panache.common.WithSession;
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -32,5 +33,10 @@ public class UserRepository implements PanacheRepository<User> {
     public Multi<User> findAllActiveUsers() {
         return list("status", UserStatus.Active)
                 .onItem().transformToMulti(users -> Multi.createFrom().iterable(users));
+    }
+
+    @WithSession
+    public Uni<User> findByActivationToken(String token) {
+        return find("activationToken", token).firstResult();
     }
 }

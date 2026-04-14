@@ -15,38 +15,38 @@ public class GlobalExceptionMapper implements ExceptionMapper<Throwable> {
     public Response toResponse(Throwable exception) {
         LOG.errorf(exception, "Exception caught: %s", exception.getMessage());
 
-        if (exception instanceof UserNotFoundException) {
-            return Response.status(Response.Status.NOT_FOUND)
+        return switch (exception) {
+            case InvalidTokenException invalidTokenException -> Response.status(Response.Status.BAD_REQUEST)
+                    .entity(new ErrorResponse(
+                            Response.Status.BAD_REQUEST.getStatusCode(),
+                            exception.getMessage()
+                    ))
+                    .build();
+            case UserNotFoundException userNotFoundException -> Response.status(Response.Status.NOT_FOUND)
                     .entity(new ErrorResponse(
                             Response.Status.NOT_FOUND.getStatusCode(),
                             exception.getMessage()
                     ))
                     .build();
-        }
-
-        if (exception instanceof ForbiddenException) {
-            return Response.status(Response.Status.FORBIDDEN)
+            case ForbiddenException forbiddenException -> Response.status(Response.Status.FORBIDDEN)
                     .entity(new ErrorResponse(
                             Response.Status.FORBIDDEN.getStatusCode(),
                             exception.getMessage()
                     ))
                     .build();
-        }
-
-        if (exception instanceof IllegalArgumentException) {
-            return Response.status(Response.Status.CONFLICT)
+            case IllegalArgumentException illegalArgumentException -> Response.status(Response.Status.CONFLICT)
                     .entity(new ErrorResponse(
                             Response.Status.CONFLICT.getStatusCode(),
                             exception.getMessage()
                     ))
                     .build();
-        }
+            default -> Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(new ErrorResponse(
+                            Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(),
+                            "An unexpected error occurred"
+                    ))
+                    .build();
+        };
 
-        return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                .entity(new ErrorResponse(
-                        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(),
-                        "An unexpected error occurred"
-                ))
-                .build();
     }
 }

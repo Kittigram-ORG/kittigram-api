@@ -73,6 +73,13 @@ public class UserResource {
                 .onItem().transform(user -> Response.ok(user).build());
     }
 
+    @GET
+    @Path("/activate")
+    public Uni<Response> activate(@QueryParam("token") String token) {
+        return userService.activateByToken(token)
+                .onItem().transform(user -> Response.ok(user).build());
+    }
+
     private void requireSelf(String email) {
         String tokenEmail = jwt.getClaim("email");
         if (!email.equals(tokenEmail)) {

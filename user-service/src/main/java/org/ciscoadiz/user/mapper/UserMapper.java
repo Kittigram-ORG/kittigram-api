@@ -7,6 +7,8 @@ import org.ciscoadiz.user.dto.UserUpdateRequest;
 import org.ciscoadiz.user.entity.User;
 import org.ciscoadiz.user.entity.UserStatus;
 
+import java.util.UUID;
+
 @ApplicationScoped
 public class UserMapper {
     public User toEntity(UserCreateRequest request, String passwordHash) {
@@ -16,7 +18,8 @@ public class UserMapper {
         user.name = request.name();
         user.surname = request.surname();
         user.birthdate = request.birthdate();
-        user.status = UserStatus.Active;
+        user.status = UserStatus.Pending;
+        user.activationToken = UUID.randomUUID().toString();
         return user;
     }
 
