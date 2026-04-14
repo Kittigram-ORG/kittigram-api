@@ -220,7 +220,7 @@ No añadir `@WithSession` si la sesión ya está abierta en el Service llamante.
 **Entidades**:
 - `User` → tabla `users.users`
   - id, email, passwordHash, name, surname, birthdate, status, activationToken, createdAt, updatedAt
-  - `UserStatus`: Active, Inactive, Banned
+  - `UserStatus`: Pending, Active, Inactive, Banned
   - `@PrePersist` y `@PreUpdate` para timestamps
 
 **Estructura**:
@@ -245,6 +245,7 @@ exception/GlobalExceptionMapper.java
 - `POST /users` → 201 Created + Location header (**público**, registro)
 - `GET /users/{email}` → 200 (**requiere JWT**)
 - `GET /users/active` → Multi stream (**requiere JWT**)
+- `GET /users/activate?token=xxx` → 200 (**público**, activa cuenta con token UUID)
 - `PUT /users/{email}` → 200 (**requiere JWT**, solo el propio usuario)
 - `PUT /users/{email}/activate` → 200 (**requiere JWT**, solo el propio usuario)
 - `PUT /users/{email}/deactivate` → 200 (**requiere JWT**, solo el propio usuario)
@@ -671,6 +672,95 @@ CREATE SCHEMA IF NOT EXISTS cats;
 
 ---
 
+## Tests de Integración
+
+Cada servicio tiene su propio conjunto de tests de integración con `@QuarkusIntegrationTest` / `@QuarkusTest`. La estrategia varía por servicio según sus dependencias externas.
+
+### Estrategia por servicio
+
+#### user-service
+- **Framework**: `@QuarkusTest` + `RestAssured`
+- **PostgreSQL**: DevServices (Testcontainer automático de Quarkus)
+- **Kafka**: `InMemoryConnectorLifecycleManager` implementa `QuarkusTestResourceLifecycleManager` para sustituir el conector Kafka por el conector en memoria de SmallRye
+- **Tests**: registro de usuario (201 + Location), activación por token válido, activación con token inválido (400)
+
+```java
+@QuarkusTestResource(InMemoryConnectorLifecycleManager.class)
+@QuarkusTest
+class UserResourceTest { ... }
+```
+
+#### auth-service
+- **Framework**: `@QuarkusTest` + `RestAssured`
+- **PostgreSQL**: DevServices
+- **gRPC mock**: `@InjectMock` sobre `UserServiceClient` para aislar auth-service de user-service
+- **Tests**: login exitoso, credenciales inválidas (401), refresh inválido (401), logout (204)
+
+```java
+@InjectMock
+UserServiceClient userServiceClient;
+```
+
+#### cat-service
+- **Framework**: `@QuarkusTest` + `RestAssured`
+- **PostgreSQL**: DevServices
+- **JWT de prueba**: `@io.smallrye.jwt.build.Jwt` para generar tokens firmados con la clave de test
+- **Tests**: búsqueda pública, 404 en gato inexistente, creación sin token (401), creación autenticada (201)
+- **Pendiente**: tests de imagen (upload) con WireMock para el StorageClient
+
+#### storage-service
+- **Framework**: `@QuarkusTest` + `RestAssured`
+- **MinIO**: `MinioTestResource` implementa `QuarkusTestResourceLifecycleManager`, levanta un contenedor MinIO real y crea el bucket automáticamente antes del test
+- **Tests**: subida de JPG exitosa, rechazo de tipo de fichero inválido (400)
+- **Nota**: durante el desarrollo de los tests se descubrió que `InvalidFileException` no tenía mapper → se añadió `GlobalExceptionMapper` y `ErrorResponse` al servicio
+
+```java
+public class MinioTestResource implements QuarkusTestResourceLifecycleManager {
+    private static final GenericContainer<?> minio = new GenericContainer<>("minio/minio")
+            .withEnv("MINIO_ROOT_USER", "kittigram")
+            .withEnv("MINIO_ROOT_PASSWORD", "kittigram123")
+            .withCommand("server /data")
+            .withExposedPorts(9000);
+    // crear bucket tras arrancar el contenedor
+}
+```
+
+#### gateway-service
+- **Framework**: `@QuarkusTest` + `RestAssured`
+- **Servicios internos**: WireMock DevService de Quarkus simula todos los servicios internos (user, auth, cat, storage) en un único servidor stub
+- **Tests**: routing de login a auth-service, JWT filter bloquea endpoints protegidos (401), ruta pública de cats (200), ruta desconocida (401)
+
+#### notification-service
+- **Framework**: `@QuarkusTest`
+- **Kafka**: canal en memoria (`smallrye.messaging.connector.smallrye-in-memory`)
+- **Email**: `MockMailbox` (inyectado vía `@Inject io.quarkus.mailer.MockMailbox`)
+- **Asincronía**: `Awaitility` para esperar el procesamiento del evento antes de hacer las aserciones
+- **Tests**: verifica subject del email, verifica que el enlace de activación contiene el token
+
+```java
+@Test
+void whenUserRegistered_thenActivationEmailSent() {
+    // publicar evento al canal en memoria
+    InMemoryConnector.sink("user-registered").send(...);
+    // esperar con Awaitility hasta recibir el email
+    await().atMost(5, SECONDS).until(() -> mailbox.getTotalMessagesSent() == 1);
+    // assertar subject y enlace
+}
+```
+
+### Dependencias de test añadidas
+
+| Servicio | Dependencias añadidas |
+|---|---|
+| user-service | `quarkus-test-vertx`, `smallrye-reactive-messaging-in-memory` |
+| auth-service | `quarkus-junit5-mockito` |
+| cat-service | `quarkus-test-security`, `quarkus-smallrye-jwt-build` |
+| storage-service | `testcontainers` (MinIO container manual) |
+| gateway-service | `quarkus-wiremock` |
+| notification-service | `quarkus-mailer` (MockMailbox), `awaitility` |
+
+---
+
 ## Pendiente / Deuda Técnica
 
 ### Funcionalidad pendiente
@@ -682,12 +772,11 @@ CREATE SCHEMA IF NOT EXISTS cats;
 6. **`ban-service`** → sistema de baneo temporal/permanente con desbaneo automático via `@Scheduled`
 7. **`adoption-service`** → proceso de adopción, historial, reportes
 8. **`docker-compose.yml` de producción** → con todos los servicios
-9. **Gateway: rutas de notification-service** → exponer `GET /api/users/activate` (ya está en user-service)
+9. **cat-service**: tests de imagen (upload/delete) con WireMock para StorageClient
 
 ### Deuda técnica
 - `@JsonProperty` en todos los records de todos los servicios para deserialización correcta
 - Validación de entrada (campos obligatorios, formatos)
-- Tests
 
 ### Servicios futuros planificados
 ```

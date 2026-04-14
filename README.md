@@ -79,10 +79,10 @@ Single entry point for all API traffic. Responsibilities:
 Manages user accounts and exposes a gRPC server for credential validation.
 
 **Endpoints:**
-- `POST /users` — Register a new user (status: Pending)
+- `POST /users` — Register a new user (status: Pending, sends activation email via Kafka)
+- `GET /users/activate?token=xxx` — Activate account (public)
 - `GET /users/{email}` — Get user by email (JWT required)
 - `PUT /users/{email}` — Update user (JWT, owner only)
-- `GET /users/activate?token=xxx` — Activate account
 
 **gRPC:**
 ```proto
@@ -92,7 +92,7 @@ service UserService {
 }
 ```
 
-**User statuses:** `Pending` → `Active` → `Inactive` / `Banned`
+**User statuses:** `Pending` (tras registro) → `Active` (tras activar email) → `Inactive` / `Banned`
 
 ---
 
@@ -145,6 +145,31 @@ Consumes Kafka events and sends transactional emails via SMTP.
 
 **Kafka topics consumed:**
 - `user-registered` → Sends account activation email
+
+---
+
+## Testing
+
+Each service has integration tests using `@QuarkusTest` + RestAssured. External dependencies are handled per service:
+
+| Service              | DB             | External deps                                      |
+|----------------------|----------------|----------------------------------------------------|
+| user-service         | DevServices PG | SmallRye in-memory connector (Kafka)               |
+| auth-service         | DevServices PG | `@InjectMock` on gRPC client                       |
+| cat-service          | DevServices PG | JWT test token via `quarkus-smallrye-jwt-build`    |
+| storage-service      | —              | Real MinIO container via `QuarkusTestResourceLifecycleManager` |
+| gateway-service      | —              | WireMock DevService (stubs all internal services)  |
+| notification-service | —              | MockMailbox + in-memory Kafka + Awaitility         |
+
+```bash
+# Run tests for a specific service
+mvn verify -pl user-service
+mvn verify -pl auth-service
+mvn verify -pl storage-service
+mvn verify -pl cat-service
+mvn verify -pl gateway-service
+mvn verify -pl notification-service
+```
 
 ---
 
@@ -236,6 +261,7 @@ mvn quarkus:dev -pl notification-service
 |--------------|----------------------------|--------------------------|
 | MinIO Console| http://localhost:9001       | Object storage UI        |
 | MailHog      | http://localhost:8025       | Email testing UI         |
+| Kafka UI     | http://localhost:8008       | Kafka topic browser      |
 
 ---
 
@@ -270,7 +296,7 @@ Entities do not use `@OneToMany` or `@ManyToOne`. Cross-entity queries are done 
 
 ## Roadmap
 
-- [ ] Tests (unit + integration)
+- [x] Integration tests for all services
 - [ ] DDD refactor (Value Objects, Aggregates, Domain Events)
 - [ ] Hexagonal architecture explicit package structure
 - [ ] Input validation on all endpoints
