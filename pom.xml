@@ -24,6 +24,7 @@
         <module>storage-service</module>
         <module>cat-service</module>
         <module>gateway-service</module>
+        <module>notification-service</module>
     </modules>
 
     <dependencyManagement>

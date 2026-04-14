@@ -1,8 +1,10 @@
 package org.ciscoadiz.user.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.quarkus.elytron.security.common.BcryptUtil;
 import io.quarkus.hibernate.reactive.panache.common.WithSession;
 import io.quarkus.hibernate.reactive.panache.common.WithTransaction;
+import io.quarkus.logging.Log;
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -12,10 +14,13 @@ import org.ciscoadiz.user.dto.UserResponse;
 import org.ciscoadiz.user.dto.UserUpdateRequest;
 import org.ciscoadiz.user.entity.User;
 import org.ciscoadiz.user.entity.UserStatus;
+import org.ciscoadiz.user.event.UserRegisteredEvent;
 import org.ciscoadiz.user.exception.InvalidTokenException;
 import org.ciscoadiz.user.exception.UserNotFoundException;
 import org.ciscoadiz.user.mapper.UserMapper;
 import org.ciscoadiz.user.repository.UserRepository;
+import org.eclipse.microprofile.reactive.messaging.Channel;
+import org.eclipse.microprofile.reactive.messaging.Emitter;
 
 import java.util.List;
 
@@ -46,6 +51,11 @@ public class UserService {
                 .onItem().transform(userMapper::toResponse);
     }
 
+    @Inject
+    @Channel("user-registered")
+    Emitter<UserRegisteredEvent> userRegisteredEmitter;
+    @Inject
+    ObjectMapper objectMapper;
     @WithTransaction
     public Uni<UserResponse> createUser(UserCreateRequest request) {
         return userRepository.existsByEmail(request.email())
@@ -58,7 +68,15 @@ public class UserService {
                     var user = userMapper.toEntity(request, hashedPassword);
                     return userRepository.persist(user);
                 })
-                .onItem().transform(userMapper::toResponse);
+                .onItem().transform(user -> {
+                    userRegisteredEmitter.send(new UserRegisteredEvent(
+                            user.id,
+                            user.email,
+                            user.name,
+                            user.activationToken
+                    ));
+                    return userMapper.toResponse(user);
+                });
     }
 
     @WithTransaction
@@ -67,7 +85,16 @@ public class UserService {
                 .onItem().ifNull().failWith(() -> new UserNotFoundException(email)).onItem().transformToUni(user -> {
                     userMapper.updateEntity(user, request);
                     return userRepository.persist(user);
-                }).onItem().transform(userMapper::toResponse);
+                }).onItem().transform(user -> {
+                    userRegisteredEmitter.send(new UserRegisteredEvent(
+                            user.id,
+                            user.email,
+                            user.name,
+                            user.activationToken
+                    ));
+                    return userMapper.toResponse(user);
+                });
+
     }
 
     @WithTransaction
