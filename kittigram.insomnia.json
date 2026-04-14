@@ -1,0 +1,247 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2026-04-14",
+  "__export_source": "kittigram",
+  "resources": [
+    {
+      "_id": "env_1",
+      "_type": "environment",
+      "name": "Kittigram Dev",
+      "data": {
+        "base_url": "http://localhost:8080",
+        "access_token": "",
+        "refresh_token": ""
+      }
+    },
+    {
+      "_id": "wrk_1",
+      "_type": "workspace",
+      "name": "Kittigram API",
+      "description": "Entorno de pruebas para la API de Kittigram"
+    },
+    {
+      "_id": "fld_auth",
+      "_type": "request_group",
+      "name": "Auth",
+      "parentId": "wrk_1"
+    },
+    {
+      "_id": "req_login",
+      "_type": "request",
+      "name": "Login",
+      "parentId": "fld_auth",
+      "method": "POST",
+      "url": "{{ _.base_url }}/api/auth/login",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"email\": \"tote@ciscoadiz.org\",\n  \"password\": \"password123\"\n}"
+      },
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" }
+      ]
+    },
+    {
+      "_id": "req_refresh",
+      "_type": "request",
+      "name": "Refresh Token",
+      "parentId": "fld_auth",
+      "method": "POST",
+      "url": "{{ _.base_url }}/api/auth/refresh",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"refreshToken\": \"{{ _.refresh_token }}\"\n}"
+      },
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" }
+      ]
+    },
+    {
+      "_id": "req_logout",
+      "_type": "request",
+      "name": "Logout",
+      "parentId": "fld_auth",
+      "method": "POST",
+      "url": "{{ _.base_url }}/api/auth/logout",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"refreshToken\": \"{{ _.refresh_token }}\"\n}"
+      },
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" },
+        { "name": "Authorization", "value": "Bearer {{ _.access_token }}" }
+      ]
+    },
+    {
+      "_id": "fld_users",
+      "_type": "request_group",
+      "name": "Users",
+      "parentId": "wrk_1"
+    },
+    {
+      "_id": "req_register",
+      "_type": "request",
+      "name": "Register",
+      "parentId": "fld_users",
+      "method": "POST",
+      "url": "{{ _.base_url }}/api/users",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"email\": \"tote@ciscoadiz.org\",\n  \"password\": \"password123\",\n  \"name\": \"Tote\",\n  \"surname\": \"Cisco\"\n}"
+      },
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" }
+      ]
+    },
+    {
+      "_id": "req_get_user",
+      "_type": "request",
+      "name": "Get User",
+      "parentId": "fld_users",
+      "method": "GET",
+      "url": "{{ _.base_url }}/api/users/tote@ciscoadiz.org",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ _.access_token }}" }
+      ]
+    },
+    {
+      "_id": "fld_cats",
+      "_type": "request_group",
+      "name": "Cats",
+      "parentId": "wrk_1"
+    },
+    {
+      "_id": "req_search_cats",
+      "_type": "request",
+      "name": "Search Cats",
+      "parentId": "fld_cats",
+      "method": "GET",
+      "url": "{{ _.base_url }}/api/cats",
+      "parameters": [
+        { "name": "city", "value": "" },
+        { "name": "name", "value": "" }
+      ]
+    },
+    {
+      "_id": "req_get_cat",
+      "_type": "request",
+      "name": "Get Cat",
+      "parentId": "fld_cats",
+      "method": "GET",
+      "url": "{{ _.base_url }}/api/cats/1"
+    },
+    {
+      "_id": "req_create_cat",
+      "_type": "request",
+      "name": "Create Cat",
+      "parentId": "fld_cats",
+      "method": "POST",
+      "url": "{{ _.base_url }}/api/cats",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"name\": \"Peluso\",\n  \"age\": 2,\n  \"sex\": \"Male\",\n  \"description\": \"Gato muy cariñoso\",\n  \"neutered\": true,\n  \"city\": \"La Orotava\",\n  \"region\": \"Tenerife\",\n  \"country\": \"España\",\n  \"latitude\": 28.3392,\n  \"longitude\": -16.5226\n}"
+      },
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" },
+        { "name": "Authorization", "value": "Bearer {{ _.access_token }}" }
+      ]
+    },
+    {
+      "_id": "req_update_cat",
+      "_type": "request",
+      "name": "Update Cat",
+      "parentId": "fld_cats",
+      "method": "PUT",
+      "url": "{{ _.base_url }}/api/cats/1",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"name\": \"Peluso\",\n  \"age\": 3,\n  \"description\": \"Gato muy cariñoso y juguetón\",\n  \"neutered\": true,\n  \"city\": \"La Orotava\",\n  \"region\": \"Tenerife\",\n  \"country\": \"España\"\n}"
+      },
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" },
+        { "name": "Authorization", "value": "Bearer {{ _.access_token }}" }
+      ]
+    },
+    {
+      "_id": "req_delete_cat",
+      "_type": "request",
+      "name": "Delete Cat",
+      "parentId": "fld_cats",
+      "method": "DELETE",
+      "url": "{{ _.base_url }}/api/cats/1",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ _.access_token }}" }
+      ]
+    },
+    {
+      "_id": "req_upload_image",
+      "_type": "request",
+      "name": "Upload Image",
+      "parentId": "fld_cats",
+      "method": "POST",
+      "url": "{{ _.base_url }}/api/cats/1/images",
+      "body": {
+        "mimeType": "multipart/form-data",
+        "params": [
+          {
+            "name": "file",
+            "type": "file",
+            "fileName": ""
+          }
+        ]
+      },
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ _.access_token }}" }
+      ]
+    },
+    {
+      "_id": "req_delete_image",
+      "_type": "request",
+      "name": "Delete Image",
+      "parentId": "fld_cats",
+      "method": "DELETE",
+      "url": "{{ _.base_url }}/api/cats/1/images/1",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ _.access_token }}" }
+      ]
+    },
+    {
+      "_id": "fld_storage",
+      "_type": "request_group",
+      "name": "Storage",
+      "parentId": "wrk_1"
+    },
+    {
+      "_id": "req_upload_file",
+      "_type": "request",
+      "name": "Upload File",
+      "parentId": "fld_storage",
+      "method": "POST",
+      "url": "{{ _.base_url }}/api/storage/upload",
+      "body": {
+        "mimeType": "multipart/form-data",
+        "params": [
+          {
+            "name": "file",
+            "type": "file",
+            "fileName": ""
+          }
+        ]
+      },
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ _.access_token }}" }
+      ]
+    },
+    {
+      "_id": "req_delete_file",
+      "_type": "request",
+      "name": "Delete File",
+      "parentId": "fld_storage",
+      "method": "DELETE",
+      "url": "{{ _.base_url }}/api/storage/files/KEY",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ _.access_token }}" }
+      ]
+    }
+  ]
+}
