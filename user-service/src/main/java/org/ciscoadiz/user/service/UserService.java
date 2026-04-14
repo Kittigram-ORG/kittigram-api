@@ -9,6 +9,8 @@ import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import org.ciscoadiz.user.domain.ActivationToken;
+import org.ciscoadiz.user.domain.Email;
 import org.ciscoadiz.user.dto.UserCreateRequest;
 import org.ciscoadiz.user.dto.UserResponse;
 import org.ciscoadiz.user.dto.UserUpdateRequest;
@@ -31,12 +33,16 @@ public class UserService {
     UserRepository userRepository;
     @Inject
     UserMapper userMapper;
+    @Inject
+    @Channel("user-registered")
+    Emitter<UserRegisteredEvent> userRegisteredEmitter;
+    @Inject
+    ObjectMapper objectMapper;
 
     @WithSession
     public Uni<UserResponse> findByEmail(String email) {
-        return userRepository.findByEmail(email)
-                .onItem()
-                .ifNull()
+        return userRepository.findByEmail(Email.of(email).value())
+                .onItem().ifNull()
                 .failWith(() -> new UserNotFoundException(email))
                 .onItem().transform(userMapper::toResponse);
     }
@@ -51,18 +57,15 @@ public class UserService {
                 .onItem().transform(userMapper::toResponse);
     }
 
-    @Inject
-    @Channel("user-registered")
-    Emitter<UserRegisteredEvent> userRegisteredEmitter;
-    @Inject
-    ObjectMapper objectMapper;
+
     @WithTransaction
     public Uni<UserResponse> createUser(UserCreateRequest request) {
-        return userRepository.existsByEmail(request.email())
+        Email email = Email.of(request.email());
+        return userRepository.existsByEmail(email.value())
                 .onItem().transformToUni(exists -> {
                     if (exists) {
                         return Uni.createFrom()
-                                .failure(new IllegalArgumentException(request.email()));
+                                .failure(new IllegalArgumentException(email.value()));
                     }
                     var hashedPassword = BcryptUtil.bcryptHash(request.password());
                     var user = userMapper.toEntity(request, hashedPassword);
@@ -70,10 +73,7 @@ public class UserService {
                 })
                 .onItem().transform(user -> {
                     userRegisteredEmitter.send(new UserRegisteredEvent(
-                            user.id,
-                            user.email,
-                            user.name,
-                            user.activationToken
+                            user.id, user.email, user.name, user.activationToken
                     ));
                     return userMapper.toResponse(user);
                 });
@@ -116,7 +116,8 @@ public class UserService {
 
     @WithTransaction
     public Uni<UserResponse> activateByToken(String token) {
-        return userRepository.findByActivationToken(token)
+        ActivationToken activationToken = ActivationToken.of(token);
+        return userRepository.findByActivationToken(activationToken.value())
                 .onItem().ifNull()
                 .failWith(() -> new InvalidTokenException("Invalid or expired activation token"))
                 .onItem().transformToUni(user -> {
