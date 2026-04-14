@@ -31,6 +31,9 @@ public class AuthService {
     @Inject
     RefreshTokenRepository refreshTokenRepository;
 
+    @Inject
+    JwtTokenService jwtTokenService;
+
     @WithTransaction
     public Uni<AuthResponse> authenticate(AuthRequest request) {
         return userServiceClient.validateCredentials(request.email(), request.password())
@@ -72,11 +75,7 @@ public class AuthService {
     }
 
     private Uni<AuthResponse> generateTokens(long userId, String email) {
-        String accessToken = Jwt.issuer(issuer)
-                .subject(String.valueOf(userId))
-                .claim("email", email)
-                .expiresIn(900)
-                .sign();
+        String accessToken = jwtTokenService.generateAccessToken(userId, email);
 
         RefreshToken refreshToken = new RefreshToken();
         refreshToken.token = UUID.randomUUID().toString();
