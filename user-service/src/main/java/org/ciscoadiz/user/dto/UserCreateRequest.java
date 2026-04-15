@@ -1,5 +1,7 @@
 package org.ciscoadiz.user.dto;
 
+import org.ciscoadiz.user.entity.UserRole;
+
 import java.time.LocalDate;
 
 public record UserCreateRequest(
@@ -8,5 +10,6 @@ public record UserCreateRequest(
         String name,
         String surname,
         LocalDate birthdate,
-        String status
+        String status,
+        UserRole role
 ) { }

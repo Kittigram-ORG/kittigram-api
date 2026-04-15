@@ -1,5 +1,6 @@
 package org.ciscoadiz.user.dto;
 
+import org.ciscoadiz.user.entity.UserRole;
 import org.ciscoadiz.user.entity.UserStatus;
 
 import java.time.LocalDate;
@@ -11,6 +12,7 @@ public record UserResponse(
         String name,
         String surname,
         UserStatus status,
+        UserRole role,
         LocalDate birthdate,
         LocalDateTime createdAt,
         LocalDateTime updatedAt

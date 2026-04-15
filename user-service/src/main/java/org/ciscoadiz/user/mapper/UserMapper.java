@@ -5,6 +5,7 @@ import org.ciscoadiz.user.dto.UserCreateRequest;
 import org.ciscoadiz.user.dto.UserResponse;
 import org.ciscoadiz.user.dto.UserUpdateRequest;
 import org.ciscoadiz.user.entity.User;
+import org.ciscoadiz.user.entity.UserRole;
 import org.ciscoadiz.user.entity.UserStatus;
 
 import java.util.UUID;
@@ -19,6 +20,7 @@ public class UserMapper {
         user.surname = request.surname();
         user.birthdate = request.birthdate();
         user.status = UserStatus.Pending;
+        user.role = request.role() != null ? request.role() : UserRole.User;
         user.activationToken = UUID.randomUUID().toString();
         return user;
     }
@@ -36,6 +38,7 @@ public class UserMapper {
                 user.name,
                 user.surname,
                 user.status,
+                user.role,
                 user.birthdate,
                 user.createdAt,
                 user.updatedAt

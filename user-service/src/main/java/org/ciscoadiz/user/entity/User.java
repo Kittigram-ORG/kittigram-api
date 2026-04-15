@@ -23,6 +23,9 @@ public class User extends PanacheEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     public UserStatus status;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    public UserRole role;
     @Column(unique = true)
     public String activationToken;
     @Column(nullable = false, updatable = false )

@@ -4,6 +4,7 @@ import io.smallrye.mutiny.Uni;
 import org.ciscoadiz.user.dto.UserCreateRequest;
 import org.ciscoadiz.user.dto.UserResponse;
 import org.ciscoadiz.user.entity.User;
+import org.ciscoadiz.user.entity.UserRole;
 import org.ciscoadiz.user.entity.UserStatus;
 import org.ciscoadiz.user.event.UserRegisteredEvent;
 import org.ciscoadiz.user.exception.InvalidTokenException;
@@ -55,7 +56,7 @@ class UserServiceTest {
 
         testUserResponse = new UserResponse(
                 1L, "test@kittigram.org", "Test", "User",
-                UserStatus.Pending, null,
+                UserStatus.Pending, UserRole.User,null,
                 LocalDateTime.now(), LocalDateTime.now()
         );
     }
@@ -63,7 +64,13 @@ class UserServiceTest {
     @Test
     void createUser_success() {
         var request = new UserCreateRequest(
-                "test@kittigram.org", "password123", "Test", "User", null, null
+                "test@kittigram.org",
+                "password123",
+                "Test",
+                "User",
+                null,
+                null,
+                UserRole.User
         );
 
         when(userRepository.existsByEmail(request.email()))
@@ -87,7 +94,7 @@ class UserServiceTest {
     @Test
     void createUser_duplicateEmail_throwsIllegalArgumentException() {
         var request = new UserCreateRequest(
-                "duplicate@kittigram.org", "password123", "Test", "User", null, null
+                "duplicate@kittigram.org", "password123", "Test", "User", null, null, UserRole.User
         );
 
         when(userRepository.existsByEmail(request.email()))
@@ -134,8 +141,8 @@ class UserServiceTest {
         when(userMapper.toResponse(testUser))
                 .thenReturn(new UserResponse(
                         1L, "test@kittigram.org", "Test", "User",
-                        UserStatus.Active, null,
-                        LocalDateTime.now(), LocalDateTime.now()
+                        UserStatus.Active, UserRole.User,null,
+                        LocalDateTime.now(),LocalDateTime.now()
                 ));
 
         var result = userService.activateByToken("valid-token-123")
@@ -165,7 +172,7 @@ class UserServiceTest {
         when(userMapper.toResponse(testUser))
                 .thenReturn(new UserResponse(
                         1L, "test@kittigram.org", "Test", "User",
-                        UserStatus.Inactive, null,
+                        UserStatus.Inactive, UserRole.User,null,
                         LocalDateTime.now(), LocalDateTime.now()
                 ));
 
