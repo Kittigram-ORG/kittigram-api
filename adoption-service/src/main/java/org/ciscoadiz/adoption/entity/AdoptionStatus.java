@@ -2,9 +2,11 @@ package org.ciscoadiz.adoption.entity;
 
 public enum AdoptionStatus {
     Pending,
-    Interview,
-    FormCompleted,
-    Approved,
+    Reviewing,
+    Accepted,
     Rejected,
+    FormCompleted,
+    PaymentPending,
+    PaymentFailed,
     Completed
 }
