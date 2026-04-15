@@ -12,29 +12,47 @@ public class AdoptionForm extends PanacheEntity {
     @Column(nullable = false)
     public Long adoptionRequestId;
 
-    @Column
-    public String housingType;
+    // Datos personales verificados
+    @Column(nullable = false)
+    public String fullName;
+
+    @Column(nullable = false)
+    public String idNumber;
+
+    @Column(nullable = false)
+    public String phone;
+
+    @Column(nullable = false)
+    public String address;
+
+    @Column(nullable = false)
+    public String city;
+
+    @Column(nullable = false)
+    public String postalCode;
+
+    // Compromisos firmados
+    @Column(nullable = false)
+    public Boolean acceptsVetVisits;
+
+    @Column(nullable = false)
+    public Boolean acceptsFollowUpContact;
+
+    @Column(nullable = false)
+    public Boolean acceptsReturnIfNeeded;
+
+    @Column(nullable = false)
+    public Boolean acceptsTermsAndConditions;
+
+    // Información adicional para la organización
+    @Column(columnDefinition = "TEXT")
+    public String additionalNotes;
+
+    @Column(nullable = false)
+    public Boolean signedAdoptionContract;
 
     @Column
-    public Boolean hasGarden;
-
-    @Column
-    public Integer familySize;
-
-    @Column
-    public Boolean hasOtherPets;
-
-    @Column
-    public String otherPetsDescription;
-
-    @Column
-    public Boolean hasChildren;
-
-    @Column
-    public String experienceWithAnimals;
-
-    @Column
-    public String motivations;
+    public LocalDateTime contractSignedAt;
 
     @Column(nullable = false, updatable = false)
     public LocalDateTime createdAt;
