@@ -17,6 +17,7 @@ Kittigram es un portal donde los usuarios pueden subir perfiles de gatos para ad
 - Programación **reactiva** con Mutiny (`Uni<T>` para valores únicos, `Multi<T>` para flujos)
 - Patrón **Repository** (no Active Record) para separar responsabilidades
 - DTOs siempre, nunca se exponen entidades directamente
+- Arquitectura hexagonal **implícita** — no se explicita con packages `domain/application/infrastructure` porque añade burocracia sin valor en un contexto Jakarta EE / Quarkus
 
 ### Mapa de puertos
 ```
@@ -225,6 +226,8 @@ No añadir `@WithSession` si la sesión ya está abierta en el Service llamante.
 
 **Estructura**:
 ```
+domain/Email.java               ← Value Object (clase final, of() factory)
+domain/ActivationToken.java     ← Value Object (clase final, of() factory)
 entity/User.java
 entity/UserStatus.java
 event/UserRegisteredEvent.java  ← record publicado a Kafka
@@ -673,9 +676,105 @@ CREATE SCHEMA IF NOT EXISTS cats;
 
 ---
 
+## Value Objects y DDD Táctico
+
+### Decisión: Value Objects como clases finales, no records
+
+Los Value Objects se implementan como **clases finales con constructor privado y método estático `of()`**. No se usan records porque los records no pueden tener un constructor canónico verdaderamente privado, lo que impediría garantizar las invariantes de construcción.
+
+```java
+public final class Email {
+    private final String value;
+
+    private Email(String value) {
+        this.value = value;
+    }
+
+    public static Email of(String value) {
+        if (value == null || !value.contains("@")) {
+            throw new IllegalArgumentException("Invalid email: " + value);
+        }
+        return new Email(value.toLowerCase());
+    }
+
+    public String value() { return value; }
+}
+```
+
+### Responsabilidades
+
+| Capa | Responsabilidad |
+|------|-----------------|
+| Value Object | Validación de **formato** únicamente |
+| Service | Validación de **reglas de negocio** (duplicados, tokens expirados, etc.) |
+| Mapper | Transformación pura (sin validación, sin lógica de negocio) |
+| GlobalExceptionMapper | Traducción de excepciones de dominio a respuestas HTTP |
+
+### Ubicación en el proyecto
+
+Los VOs viven en un package `domain/` dentro de cada servicio:
+```
+user-service/src/main/java/org/ciscoadiz/user/domain/
+    Email.java
+    ActivationToken.java
+```
+
+### Principios SOLID aplicados
+- **SRP**: cada capa tiene una única razón de cambio
+- **OCP**: VOs inmutables, extensión sin modificación
+- **ISP**: interfaces de repository enfocadas (un método = un contrato)
+- **DIP**: Services dependen de interfaces de Repository (ports), no de implementaciones
+
+### Repository como puerto (DIP)
+
+Los Services dependerán de interfaces, no de las implementaciones `PanacheRepository`:
+```java
+// Puerto (en domain/ o repository/)
+public interface UserRepository {
+    Uni<User> findByEmail(String email);
+    Uni<User> findByActivationToken(String token);
+    Uni<User> persist(User user);
+}
+
+// Adaptador (implementación)
+@ApplicationScoped
+public class UserRepositoryImpl extends PanacheRepository<User> implements UserRepository { ... }
+```
+
+---
+
 ## Tests de Integración
 
 Cada servicio tiene su propio conjunto de tests de integración con `@QuarkusIntegrationTest` / `@QuarkusTest`. La estrategia varía por servicio según sus dependencias externas.
+
+### Convención de configuración de tests
+
+**No se crea un `application.properties` separado para tests.** Toda la configuración específica de test se añade al `application.properties` principal usando el perfil `%test.`:
+
+```properties
+# Perfil test: init script para DevServices PostgreSQL
+%test.quarkus.datasource.devservices.init-script-path=init-test.sql
+
+# Perfil test: conector Kafka en memoria en lugar del real
+%test.mp.messaging.connector.smallrye-kafka.connector=smallrye-in-memory
+```
+
+El fichero `src/test/resources/init-test.sql` crea el schema necesario para los tests de integración:
+```sql
+CREATE SCHEMA IF NOT EXISTS users;
+```
+
+### Recuento de tests (estado actual)
+
+| Servicio | Integración | Unitarios | Total |
+|---|---|---|---|
+| user-service | 3 | 8 | **11** |
+| auth-service | 4 | 7 | **11** |
+| cat-service | 5 | 9 | **14** |
+| storage-service | 2 | 6 | **8** |
+| gateway-service | 4 | — | **4** |
+| notification-service | 2 | 3 | **5** |
+| **Total** | **20** | **33** | **53** |
 
 ### Tests unitarios
 
@@ -903,3 +1002,36 @@ docker exec -it kittigram-postgres-1 psql -U kittigram -d kittigram -c "\dt cats
 | MAIL_HOST | localhost | Host SMTP (MailHog en dev) |
 | MAIL_PORT | 1025 | Puerto SMTP |
 | MAIL_FROM | kittigram@ciscoadiz.org | Remitente de los emails |
+
+---
+
+## Historial de Sesiones
+
+### Sesión 2026-04-14
+
+**Bloque 1 — Storage y gateway**
+- `storage-service`: nuevo endpoint `GET /storage/files/{key}` que sirve objetos desde S3/MinIO con su `Content-Type` original. `S3StorageProvider.getUrl()` ahora devuelve la URL pública a través del gateway, desacoplando URLs de imagen del almacenamiento interno.
+- `gateway-service`: rutas públicas para ficheros (`GET /api/storage/files/*`), logging de requests, CORS configurado para Vite (`localhost:5173`) con credentials y `max-age=86400`.
+
+**Bloque 2 — Verificación de email**
+- `user-service`: estado `Pending` añadido a `UserStatus`. Los nuevos usuarios se crean con `activationToken` UUID. Nuevo endpoint público `GET /users/activate?token=`.
+- `notification-service`: consume el evento `user-registered` de Kafka y envía email HTML de activación via `ReactiveMailer` + MailHog en dev.
+- `docker-compose`: MailHog añadido (SMTP 1025, UI 8025). Kafka con dos listeners separados: `INTERNAL` (kafka:29092, para contenedores Docker) y `EXTERNAL` (localhost:9092, para servicios del host).
+
+**Bloque 3 — Tests de integración** (todos los servicios)
+- Estrategia: `@QuarkusTest` + RestAssured. PostgreSQL vía DevServices, Kafka in-memory, MinIO Testcontainer real, WireMock para gateway, `@InjectMock` para gRPC, MockMailbox + Awaitility para notificaciones.
+- `storage-service`: durante los tests se descubrió que faltaba `GlobalExceptionMapper` → añadido.
+- Total inicial: ~20 tests de integración.
+
+**Bloque 4 — Tests unitarios y refactor**
+- `auth-service`: `JwtTokenService` extraído de `AuthService` para hacer la firma JWT inyectable y mockeable. `AuthServiceTest` con Mockito cubre 7 escenarios.
+- `user-service`: `Email` y `ActivationToken` introducidos como Value Objects en `domain/`. `UserServiceTest` con Mockito cubre 8 escenarios.
+- Configuración de tests consolidada: perfiles `%test.*` en el `application.properties` principal, sin fichero separado.
+
+**Bloque 5 — Decisiones de arquitectura**
+- Arquitectura hexagonal implícita: no se explicita con packages `domain/application/infrastructure`.
+- Value Objects: clases finales con constructor privado y `of()` como factory (no records).
+- Repository como puerto (DIP): Services dependerán de interfaces, no de `PanacheRepository` directamente.
+- GitKraken AI configurado (250k tokens/semana, Gemini Flash) con Conventional Commits y Commit Composer.
+
+**Estado al cierre**: 53 tests en total (20 integración + 33 unitarios) distribuidos en 6 servicios.

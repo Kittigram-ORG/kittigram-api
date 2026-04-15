@@ -152,21 +152,30 @@ Consumes Kafka events and sends transactional emails via SMTP.
 
 **Unit tests** use plain Mockito (`@ExtendWith(MockitoExtension.class)`) with no container dependencies:
 
-| Service      | Coverage                                                        |
-|--------------|-----------------------------------------------------------------|
-| user-service | Registration, activation, deactivation, duplicate email, errors |
-| auth-service | Authenticate, refresh (valid/expired/revoked), logout           |
+| Service      | Tests | Coverage                                                        |
+|--------------|-------|-----------------------------------------------------------------|
+| user-service | 8     | Registration, activation, deactivation, duplicate email, errors |
+| auth-service | 7     | Authenticate, refresh (valid/expired/revoked), logout           |
+| cat-service  | 9     | CRUD, owner checks, image management                            |
+| storage-service | 6  | Upload validation, file type enforcement                        |
+| notification-service | 3 | Event consumption, email content                           |
 
-**Integration tests** use `@QuarkusTest` + RestAssured. External dependencies are handled per service:
+**Integration tests** use `@QuarkusTest` + RestAssured. No separate `application.properties` for tests — `%test.*` profiles are used in the main config file:
 
-| Service              | DB             | External deps                                      |
-|----------------------|----------------|----------------------------------------------------|
-| user-service         | DevServices PG | SmallRye in-memory connector (Kafka)               |
-| auth-service         | DevServices PG | `@InjectMock` on gRPC client                       |
-| cat-service          | DevServices PG | JWT test token via `quarkus-smallrye-jwt-build`    |
-| storage-service      | —              | Real MinIO container via `QuarkusTestResourceLifecycleManager` |
-| gateway-service      | —              | WireMock DevService (stubs all internal services)  |
-| notification-service | —              | MockMailbox + in-memory Kafka + Awaitility         |
+```properties
+%test.quarkus.datasource.devservices.init-script-path=init-test.sql
+```
+
+| Service              | Tests | DB             | External deps                                      |
+|----------------------|-------|----------------|----------------------------------------------------|
+| user-service         | 3     | DevServices PG | SmallRye in-memory connector (Kafka)               |
+| auth-service         | 4     | DevServices PG | `@InjectMock` on gRPC client                       |
+| cat-service          | 5     | DevServices PG | JWT test token via `quarkus-smallrye-jwt-build`    |
+| storage-service      | 2     | —              | Real MinIO container via `QuarkusTestResourceLifecycleManager` |
+| gateway-service      | 4     | —              | WireMock 1.6.1 DevService (stubs all internal services) |
+| notification-service | 2     | —              | MockMailbox + in-memory Kafka + Awaitility         |
+
+**Total: 53 tests** (20 integration + 33 unit)
 
 ```bash
 # Run tests for a specific service
@@ -294,18 +303,41 @@ public Uni<List<T>> findAll() {
 ```
 
 ### Repository Pattern
-All services use `PanacheRepository` (not Active Record) to keep domain logic separate from persistence.
+All services use `PanacheRepository` (not Active Record) to keep domain logic separate from persistence. Repository interfaces (ports) are being extracted so Services depend on abstractions, enabling full DIP compliance and easier unit testing.
 
 ### No JPA Relations
 Entities do not use `@OneToMany` or `@ManyToOne`. Cross-entity queries are done explicitly in the service layer.
+
+### Value Objects
+Domain concepts with format constraints (e.g. `Email`, `ActivationToken`) are implemented as **immutable final classes** with a private constructor and a `static of()` factory method — not records, because records cannot enforce a truly private canonical constructor.
+
+```java
+public final class Email {
+    private final String value;
+    private Email(String value) { this.value = value; }
+
+    public static Email of(String raw) {
+        if (raw == null || !raw.contains("@"))
+            throw new IllegalArgumentException("Invalid email");
+        return new Email(raw.toLowerCase());
+    }
+
+    public String value() { return value; }
+}
+```
+
+Value Objects are responsible for **format validation only**. Business rule validation (duplicate checks, expiry) stays in the Service layer. They live in a `domain/` package within each service.
 
 ---
 
 ## Roadmap
 
 - [x] Integration tests for all services
-- [ ] DDD refactor (Value Objects, Aggregates, Domain Events)
-- [ ] Hexagonal architecture explicit package structure
+- [x] Unit tests for all Service classes (Mockito)
+- [x] Value Objects introduced (`Email`, `ActivationToken` in user-service)
+- [ ] Value Objects for remaining services
+- [ ] Repository interfaces as ports (DIP)
+- [ ] Hexagonal architecture remains implicit (no explicit package restructure planned)
 - [ ] Input validation on all endpoints
 - [ ] Pagination on cat listing
 - [ ] Image reordering
