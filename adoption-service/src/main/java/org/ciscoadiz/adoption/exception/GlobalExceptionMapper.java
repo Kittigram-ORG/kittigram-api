@@ -41,6 +41,12 @@ public class GlobalExceptionMapper implements ExceptionMapper<Throwable> {
                     .build();
         }
 
+        if (exception instanceof jakarta.ws.rs.NotFoundException) {
+            return Response.status(Response.Status.NOT_FOUND)
+                    .entity(new ErrorResponse(404, exception.getMessage()))
+                    .build();
+        }
+
         return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
                 .entity(new ErrorResponse(500, "An unexpected error occurred"))
                 .build();
