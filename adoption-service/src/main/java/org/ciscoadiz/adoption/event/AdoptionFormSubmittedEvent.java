@@ -1,6 +1,7 @@
 package org.ciscoadiz.adoption.event;
 
 public record AdoptionFormSubmittedEvent(
+        String adopterEmail,
         Long adoptionRequestId,
         Long catId,
         Long adopterId,
