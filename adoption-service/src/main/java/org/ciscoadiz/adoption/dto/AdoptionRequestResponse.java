@@ -12,6 +12,7 @@ public record AdoptionRequestResponse(
         AdoptionStatus status,
         String notes,
         String rejectionReason,
+        String adopterEmail,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {}
