@@ -1,5 +1,6 @@
 package org.ciscoadiz.adoption.service;
 
+import io.quarkus.hibernate.reactive.panache.Panache;
 import io.quarkus.hibernate.reactive.panache.common.WithSession;
 import io.quarkus.hibernate.reactive.panache.common.WithTransaction;
 import io.smallrye.mutiny.Uni;
@@ -172,16 +173,14 @@ public class AdoptionService {
     }
 
     @Incoming("adoption-form-analysed")
-    @WithTransaction
     public Uni<Void> onFormAnalysed(String message) {
         try {
-            // deserialización manual igual que en notification-service
             com.fasterxml.jackson.databind.ObjectMapper mapper =
                     new com.fasterxml.jackson.databind.ObjectMapper();
             AdoptionFormAnalysedEvent event = mapper.readValue(
                     message, AdoptionFormAnalysedEvent.class);
 
-            return adoptionRequestRepository.findById(event.adoptionRequestId())
+            return Panache.withTransaction(() -> adoptionRequestRepository.findById(event.adoptionRequestId())
                     .onItem().ifNull()
                     .failWith(() -> new AdoptionRequestNotFoundException(event.adoptionRequestId()))
                     .onItem().transformToUni(adoption -> {
@@ -190,7 +189,7 @@ public class AdoptionService {
                             adoption.rejectionReason = event.rejectionReason();
                         }
                         return adoptionRequestRepository.persist(adoption).replaceWithVoid();
-                    });
+                    }));
         } catch (Exception e) {
             return Uni.createFrom().voidItem();
         }
