@@ -1,0 +1,96 @@
+package org.ciscoadiz.adoption.resource;
+
+import io.quarkus.test.common.QuarkusTestResource;
+import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.security.TestSecurity;
+import io.quarkus.test.security.jwt.Claim;
+import io.quarkus.test.security.jwt.JwtSecurity;
+import io.restassured.http.ContentType;
+import io.smallrye.reactive.messaging.memory.InMemoryConnector;
+import org.ciscoadiz.adoption.test.KafkaTestResource;
+import org.junit.jupiter.api.Test;
+
+import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.*;
+
+@QuarkusTest
+@QuarkusTestResource(KafkaTestResource.class)
+class AdoptionResourceTest {
+
+    @Test
+    void testCreateAdoptionRequestUnauthorized() {
+        given()
+                .contentType(ContentType.JSON)
+                .body("""
+                {
+                    "catId": 1,
+                    "organizationId": 1
+                }
+                """)
+                .when()
+                .post("/adoptions")
+                .then()
+                .statusCode(401);
+    }
+
+    @Test
+    @TestSecurity(user = "1", roles = "user")
+    @JwtSecurity(claims = {
+            @Claim(key = "sub", value = "1"),
+            @Claim(key = "email", value = "test@kittigram.org")
+    })
+    void testCreateAdoptionRequest() {
+        given()
+                .contentType(ContentType.JSON)
+                .body("""
+                {
+                    "catId": 1,
+                    "organizationId": 2
+                }
+                """)
+                .when()
+                .post("/adoptions")
+                .then()
+                .statusCode(201)
+                .body("catId", equalTo(1))
+                .body("adopterId", equalTo(1))
+                .body("status", equalTo("Pending"));
+    }
+
+    @Test
+    void testFindByIdNotFound() {
+        given()
+                .when()
+                .get("/adoptions/999999")
+                .then()
+                .statusCode(401);
+    }
+
+    @Test
+    @TestSecurity(user = "1", roles = "user")
+    @JwtSecurity(claims = {
+            @Claim(key = "sub", value = "1"),
+            @Claim(key = "email", value = "test@kittigram.org")
+    })
+    void testFindByIdNotFoundAuthenticated() {
+        given()
+                .when()
+                .get("/adoptions/999999")
+                .then()
+                .statusCode(404);
+    }
+
+    @Test
+    @TestSecurity(user = "1", roles = "user")
+    @JwtSecurity(claims = {
+            @Claim(key = "sub", value = "1"),
+            @Claim(key = "email", value = "test@kittigram.org")
+    })
+    void testFindMyAdoptions() {
+        given()
+                .when()
+                .get("/adoptions/my")
+                .then()
+                .statusCode(200);
+    }
+}
