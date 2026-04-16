@@ -247,6 +247,57 @@ when(templateInstance.createUni()).thenReturn(Uni.createFrom().item("html conten
 mp.messaging.incoming.user-registered.value.deserializer=org.apache.kafka.common.serialization.StringDeserializer
 ```
 
+### 16. adopterEmail propagado desde JWT en lugar de llamar a user-service vía gRPC
+**Problema**: `adoption-service` necesitaba el email del adoptante para incluirlo en el evento `AdoptionFormSubmittedEvent`, pero no tenía acceso al servicio de usuarios.
+
+**Solución**: Extraer el email directamente del JWT en el `Resource` con `jwt.getClaim("email")` y pasarlo al service como parámetro. Evita añadir una llamada gRPC innecesaria dado que el token ya contiene el dato.
+
+### 17. AdoptionFormSubmittedEvent y AdoptionFormAnalysedEvent sin adopterEmail
+**Problema**: `notification-service` no sabía a quién enviar el email de resultado de análisis porque los eventos no incluían el email del adoptante.
+
+**Solución**: Añadir `adopterEmail` a ambos events y propagarlo por todo el flujo: `AdoptionResource` → `AdoptionService` → `AdoptionFormSubmittedEvent` → `form-analysis-service` → `AdoptionFormAnalysedEvent` → `notification-service`.
+
+### 18. Tests rotos por cambio de firma en AdoptionMapper y AdoptionService
+**Problema**: Al añadir `adopterEmail` como tercer argumento en `AdoptionMapper.toEntity()` y `AdoptionService.createAdoptionRequest()`, todos los tests existentes que llamaban a esos métodos fallaron por firma incorrecta.
+
+**Solución**: Actualizar los constructores y llamadas en `AdoptionServiceTest` y `AdoptionResourceTest` para incluir el nuevo parámetro.
+
+### 19. AdoptionRequestResponse faltaba el campo adopterEmail
+**Problema**: El record DTO de respuesta no incluía `adopterEmail` aunque la entidad sí lo tenía, causando que el campo no se expusiera en la API.
+
+**Solución**: Añadir `adopterEmail` al record `AdoptionRequestResponse` y actualizar `AdoptionMapper.toResponse()` para mapearlo.
+
+### 20. existsActiveByCatId falla con "No current Mutiny.Session found" en tests de integración
+**Problema**: El método `existsActiveByCatId()` en `AdoptionRequestRepository` llama a `count()` de Panache, que necesita sesión activa. En los tests de integración, el método se ejecutaba fuera del contexto transaccional del service.
+
+**Solución**: Añadir `@WithSession` al método `existsActiveByCatId` en `AdoptionRequestRepository`:
+```java
+@WithSession
+public Uni<Boolean> existsActiveByCatId(Long catId) {
+    return count("catId = ?1 and status not in (?2, ?3)", catId,
+            AdoptionStatus.Rejected, AdoptionStatus.Completed)
+            .map(count -> count > 0);
+}
+```
+
+### 21. FormAnalysisRulesTest roto por find & replace accidental
+**Problema**: Un find & replace para añadir `adopterEmail` a los constructores del test introdujo el campo dos veces en algunos constructores, causando errores de compilación.
+
+**Solución**: Reescribir el fichero manualmente revisando cada constructor para que contenga un único `adopterEmail`.
+
+### 22. Plantillas Qute: chain data().render() no mockeable con @InjectMocks
+**Problema**: En `AdoptionFormAnalysedConsumer`, el chain de Qute termina en `.render()` (que devuelve `Uni<String>`), pero al usar `@InjectMocks` el `Template` es `null` y el chain no se puede configurar.
+
+**Solución**: Mismo patrón que el Problema #14 pero con `.render()` en lugar de `.createUni()`:
+```java
+@Mock Template adoptionAcceptedEmail;
+@Mock TemplateInstance templateInstance;
+
+when(adoptionAcceptedEmail.data(anyString(), any())).thenReturn(templateInstance);
+when(templateInstance.data(anyString(), any())).thenReturn(templateInstance);
+when(templateInstance.render()).thenReturn(Uni.createFrom().item("<html>..."));
+```
+
 ### 8. PanacheRepository no tiene stream() en modo reactivo
 **Problema**: `find("catId", catId).stream()` no compila — `stream()` no existe en `PanacheQuery` reactivo.
 
@@ -1373,6 +1424,15 @@ docker exec -it kittigram-postgres-1 psql -U kittigram -d kittigram -c "\dt cats
 - Nuevo `AdoptionFormAnalysedConsumer`: consume `adoption-form-analysed` y envía email de resultado (aceptado/rechazado) con su plantilla Qute correspondiente. 3 plantillas HTML en total.
 - Tests unitarios actualizados para mockear `Template` y `TemplateInstance` con cadena `data()` (ver Problema #14).
 
+**Bloque 4 — Propagación de adopterEmail por el flujo de adopción**
+- `adopterEmail` añadido a `AdoptionRequest` (entidad), `AdoptionRequestResponse` (DTO) y `AdoptionMapper`. El email se extrae del JWT en `AdoptionResource` con `jwt.getClaim("email")` evitando llamadas gRPC a `user-service` (ver Problema #16).
+- `AdoptionFormSubmittedEvent` y `AdoptionFormAnalysedEvent` actualizados con `adopterEmail` para que `notification-service` sepa a quién enviar el email de resultado (ver Problema #17).
+- `form-analysis-service` propagado el campo a través de su propio flujo de eventos.
+- `notification-service`: `AdoptionFormAnalysedConsumer` usa `adopterEmail` del evento como destinatario del email.
+- Tests de `AdoptionServiceTest` y `AdoptionResourceTest` actualizados para la nueva firma (ver Problema #18).
+- `existsActiveByCatId` en `AdoptionRequestRepository` anotado con `@WithSession` para corregir fallo en integración (ver Problema #20).
+- `FormAnalysisRulesTest` reescrito para corregir duplicación accidental de `adopterEmail` (ver Problema #21).
+
 **Problemas encontrados en esta sesión**:
 - `init.sql` no se re-ejecuta si el volumen Docker ya existe → `docker compose down -v` (Problema #9)
 - `@Incoming` + `@WithTransaction` incompatibles → `Panache.withTransaction()` programático (Problema #10)
@@ -1381,6 +1441,13 @@ docker exec -it kittigram-postgres-1 psql -U kittigram -d kittigram -c "\dt cats
 - Conflicto aparente de rutas `/adoptions/my` vs `/adoptions/{id}` → JAX-RS lo resuelve correctamente (Problema #13)
 - Template Qute no inyectable con `@InjectMocks` → mocks explícitos de `Template` y `TemplateInstance` (Problema #14)
 - `UserRegisteredEventDeserializer` no encontrado → `StringDeserializer` + `ObjectMapper` manual (Problema #15)
+- `adopterEmail` obtenido del JWT en lugar de gRPC → evita complejidad innecesaria (Problema #16)
+- Eventos Kafka sin `adopterEmail` → propagado por todo el flujo hasta `notification-service` (Problema #17)
+- Tests rotos por nuevo parámetro `adopterEmail` en firma → actualización de constructores (Problema #18)
+- `AdoptionRequestResponse` sin `adopterEmail` → añadido al record y al mapper (Problema #19)
+- `existsActiveByCatId` sin sesión activa en tests de integración → `@WithSession` en repositorio (Problema #20)
+- `FormAnalysisRulesTest` con `adopterEmail` duplicado por find & replace → reescritura manual (Problema #21)
+- Chain `data().render()` de Qute no mockeable con `@InjectMocks` → mocks explícitos con `.render()` (Problema #22)
 
 **Estado al cierre**: 8 servicios implementados. 93 tests — BUILD SUCCESS en todos los módulos.
 
