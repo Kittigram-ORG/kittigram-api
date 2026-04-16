@@ -14,8 +14,6 @@ import org.ciscoadiz.formanalysis.entity.FormAnalysis;
 import org.ciscoadiz.formanalysis.entity.FormFlag;
 import org.ciscoadiz.formanalysis.event.AdoptionFormAnalysedEvent;
 import org.ciscoadiz.formanalysis.event.AdoptionFormSubmittedEvent;
-import org.ciscoadiz.formanalysis.repository.FormAnalysisRepository;
-import org.ciscoadiz.formanalysis.repository.FormFlagRepository;
 import org.ciscoadiz.formanalysis.test.KafkaTestResource;
 import org.eclipse.microprofile.reactive.messaging.spi.Connector;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,9 +40,6 @@ class FormAnalysisServiceTest {
     @InjectMock
     FormAnalysisPersistenceService persistenceService;
 
-    @InjectMock
-    FormFlagRepository formFlagRepository;
-
     @BeforeEach
     void setUp() {
         InMemorySink<AdoptionFormAnalysedEvent> sink = connector.sink("adoption-form-analysed");
@@ -55,8 +50,6 @@ class FormAnalysisServiceTest {
 
         when(persistenceService.persist(any(FormAnalysis.class), any()))
                 .thenReturn(Uni.createFrom().item(savedAnalysis));
-        when(formFlagRepository.persist(any(FormFlag.class)))
-                .thenReturn(Uni.createFrom().item(new FormFlag()));
     }
 
     @Test
@@ -65,7 +58,7 @@ class FormAnalysisServiceTest {
         InMemorySink<AdoptionFormAnalysedEvent> sink = connector.sink("adoption-form-analysed");
 
         var event = new AdoptionFormSubmittedEvent(
-                1L, 10L, 100L, 200L,
+                1L, 10L, 100L, 200L, "adopter@kittigram.org",
                 true, "Murió de vejez", 2, false, null,
                 false, null, 8, true, null,
                 "Apartment", 70, false, false, null,
@@ -94,7 +87,7 @@ class FormAnalysisServiceTest {
         InMemorySink<AdoptionFormAnalysedEvent> sink = connector.sink("adoption-form-analysed");
 
         var event = new AdoptionFormSubmittedEvent(
-                2L, 10L, 100L, 200L,
+                2L, 10L, 100L, 200L, "adopter@kittigram.org",
                 true, null, 2, false, null,
                 false, null, 8, true, null,
                 "Apartment", 70, false, false, null,
@@ -120,7 +113,7 @@ class FormAnalysisServiceTest {
         InMemorySink<AdoptionFormAnalysedEvent> sink = connector.sink("adoption-form-analysed");
 
         var event = new AdoptionFormSubmittedEvent(
-                3L, 10L, 100L, 200L,
+                3L, 10L, 100L, 200L, "adopter@kittigram.org",
                 false, null, 2, false, null,
                 false, null, 8, true, null,
                 "Apartment", 70, false, false, null,
