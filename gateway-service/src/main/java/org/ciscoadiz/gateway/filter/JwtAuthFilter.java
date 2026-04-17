@@ -16,6 +16,7 @@ public class JwtAuthFilter {
     private static final Set<String> PUBLIC_EXACT = Set.of(
             "POST:/api/auth/login",
             "POST:/api/auth/refresh",
+            "POST:/api/auth/logout",
             "POST:/api/users",
             "POST:/api/users/activate"
     );

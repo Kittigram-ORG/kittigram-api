@@ -61,12 +61,14 @@ public class ProxyService {
             response = request.send();
         }
 
-        return response.onItem().transform(r ->
-                Response.status(r.statusCode())
-                        .entity(r.body().getBytes())
-                        .header("Content-Type", r.getHeader("Content-Type"))
-                        .build()
-        );
+        return response.onItem().transform(r -> {
+            Response.ResponseBuilder rb = Response.status(r.statusCode());
+            if (r.body() != null && r.body().length() > 0) {
+                rb.entity(r.body().getBytes())
+                  .header("Content-Type", r.getHeader("Content-Type"));
+            }
+            return rb.build();
+        });
     }
 
     private String resolveTarget(String path) {
