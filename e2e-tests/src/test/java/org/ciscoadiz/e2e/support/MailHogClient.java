@@ -40,8 +40,10 @@ public class MailHogClient {
     }
 
     public static String extractActivationToken(String emailBody) {
+        // Remove Quoted-Printable soft line breaks and decode =3D
+        String decodedBody = emailBody.replaceAll("=\\r?\\n", "").replace("=3D", "=");
         // Search in raw body and also in URL-decoded form (just in case)
-        Matcher m = TOKEN_PATTERN.matcher(emailBody);
+        Matcher m = TOKEN_PATTERN.matcher(decodedBody);
         if (m.find()) {
             return m.group(1);
         }

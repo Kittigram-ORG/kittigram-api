@@ -218,12 +218,9 @@ class AdoptionJourneyE2E {
                 Map.entry("previousPetsHistory", "Had two cats before"),
                 Map.entry("adultsInHousehold", 2),
                 Map.entry("hasChildren", false),
-                Map.entry("childrenAges", (Object) null),
                 Map.entry("hasOtherPets", false),
-                Map.entry("otherPetsDescription", (Object) null),
                 Map.entry("hoursAlonePerDay", 4),
                 Map.entry("stableHousing", true),
-                Map.entry("housingInstabilityReason", (Object) null),
                 Map.entry("housingType", "Apartment"),
                 Map.entry("housingSize", 70),
                 Map.entry("hasOutdoorAccess", false),
@@ -243,8 +240,7 @@ class AdoptionJourneyE2E {
                 Map.entry("understandsLongTermCommitment", true),
                 Map.entry("hasVetBudget", true),
                 Map.entry("allHouseholdMembersAgree", true),
-                Map.entry("anyoneHasAllergies", false),
-                Map.entry("allergiesDetail", (Object) null)
+                Map.entry("anyoneHasAllergies", false)
             ))
         .when()
             .post("/api/adoptions/" + adoptionId + "/form")
