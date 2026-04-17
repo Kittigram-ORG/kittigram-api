@@ -361,7 +361,7 @@ exception/GlobalExceptionMapper.java
 - `POST /users` → 201 Created + Location header (**público**, registro)
 - `GET /users/{email}` → 200 (**requiere JWT**)
 - `GET /users/active` → Multi stream (**requiere JWT**)
-- `GET /users/activate?token=xxx` → 200 (**público**, activa cuenta con token UUID)
+- `POST /users/activate` → 200 (**público**, body `{"token":"..."}`, activa cuenta con token UUID)
 - `PUT /users/{email}` → 200 (**requiere JWT**, solo el propio usuario)
 - `PUT /users/{email}/activate` → 200 (**requiere JWT**, solo el propio usuario)
 - `PUT /users/{email}/deactivate` → 200 (**requiere JWT**, solo el propio usuario)
@@ -869,6 +869,7 @@ La ruta interna se reescribe eliminando el prefijo `/api`: `/api/cats/1` → `/c
 - `POST /api/auth/login`
 - `POST /api/auth/refresh`
 - `POST /api/users` (registro)
+- `POST /api/users/activate` (activación de cuenta)
 - `GET /api/cats` y `GET /api/cats/{id}`
 
 **Notas importantes**:
@@ -1397,6 +1398,63 @@ docker exec -it kittigram-postgres-1 psql -U kittigram -d kittigram -c "\dt cats
 | MAIL_HOST | localhost | Host SMTP (MailHog en dev) |
 | MAIL_PORT | 1025 | Puerto SMTP |
 | MAIL_FROM | kittigram@ciscoadiz.org | Remitente de los emails |
+
+---
+
+## Auditorías de Seguridad
+
+### Auditoría 2026-04-17 — Revisión estática completa
+
+**Tipo:** Análisis estático de código (SAST) — revisión manual de todos los microservicios  
+**Alcance:** auth-service, user-service, cat-service, adoption-service, gateway-service, notification-service  
+**Informe completo:** `audit-report.pdf` en la raíz del repositorio  
+**Puntuación:** 5,5 → **8,5 / 10**
+
+#### Hallazgos
+
+| ID | Severidad | Descripción | Rama | Estado |
+|----|-----------|-------------|------|--------|
+| C1 | 🔴 Crítica | IDOR en `GET /adoptions/{id}` — cualquier usuario autenticado podía leer solicitudes de otros | `fix/adoption-idor` | ✅ Corregido |
+| H1 | 🟠 Alta | Refresh token registrado en logs en texto plano (`RefreshTokenRepository`) | `fix/high-severity-bundle` | ✅ Corregido |
+| H2 | 🟠 Alta | Canal gRPC `auth-service` ↔ `user-service` sin autenticación | `fix/high-severity-bundle` | ✅ Corregido |
+| H3 | 🟠 Alta | Kafka listener `EXTERNAL` escuchando en `0.0.0.0:9092` | `fix/high-severity-bundle` | ✅ Corregido |
+| M1 | 🟡 Media | Sin Bean Validation en ningún DTO de entrada ni recurso JAX-RS | `fix/dto-input-validation` | ✅ Corregido |
+| M2 | 🟡 Media | Sin rate limiting en `/auth/login`, `/auth/refresh`, `/storage/upload` | `fix/rate-limiting-gateway` | ✅ Corregido |
+| M3 | 🟡 Media | RBAC sin implementar: claim `groups` vacío, sin `@RolesAllowed` | `fix/rbac-roles-allowed` | ✅ Corregido |
+| M4 | 🟡 Media | Token de activación de cuenta expuesto en query param `GET /activate?token=` | `fix/activation-token-query-param` | ✅ Corregido |
+| M5 | 🟡 Media | Gateway sin handler `PATCH` y path stripping incorrecto para `/api/adoptions` | `fix/gateway-patch-proxy` | ✅ Corregido |
+| M6 | 🟡 Media | Credenciales de PostgreSQL y MinIO hardcodeadas en `docker-compose.yml` | `fix/default-credentials` | ✅ Corregido |
+| M7 | 🟡 Media | Claves JWT (`privateKey.pem`, `publicKey.pem`) empaquetadas en el classpath del artefacto | `fix/jwt-keys-external-prod` | ✅ Corregido |
+
+#### Correcciones aplicadas
+
+- **C1:** Añadido helper `requireParticipant(adoption, callerId)` en `AdoptionService`; el endpoint ahora requiere que el caller sea adoptante u organización de esa solicitud.
+- **H1:** Eliminada la línea `Log.infof("Looking for token: '%s'", token)` en `RefreshTokenRepository`.
+- **H2:** Interceptores gRPC con shared-secret (`x-internal-token`): `GrpcAuthInterceptor` (server) en user-service y `GrpcClientAuthInterceptor` (client) en auth-service. Secreto configurable vía `GRPC_INTERNAL_SECRET`.
+- **H3:** `KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://127.0.0.1:9092` — listener externo restringido a localhost.
+- **M1:** `quarkus-hibernate-validator` añadido a 4 servicios. Todos los DTOs anotados con restricciones Jakarta Validation. `@Valid` en todos los parámetros de cuerpo de los recursos.
+- **M2:** `quarkus-smallrye-fault-tolerance` en gateway. `RateLimitedProxy` con `@RateLimit`: login (10/min), refresh (20/min), upload (5/min). `RateLimitExceptionMapper` → HTTP 429.
+- **M3:** Cadena completa de roles: `UserGrpcService` → proto → `AuthService` → `RefreshToken.role` → `JwtTokenService.groups` → `@RolesAllowed` en `AdoptionResource`.
+- **M4:** `GET /users/activate?token=` cambiado a `POST /users/activate` con body `{"token":"..."}`. URL del email apunta al frontend (`FRONTEND_URL`). Endpoint añadido a rutas públicas del gateway.
+- **M5:** Handler `@PATCH` añadido a `GatewayResource`. Path stripping corregido a `path.replaceFirst("^/api", "")`.
+- **M6:** Credenciales reemplazadas por `${POSTGRES_USER}`, `${POSTGRES_PASSWORD}`, `${MINIO_ROOT_USER}`, etc. Creado `.env.example`. Añadido `.env` a `.gitignore`.
+- **M7:** Perfil `%prod` en los 5 servicios con JWT: lee claves desde `/run/secrets/` (Docker/K8s Secrets). Dev y test sin cambios. Variables `JWT_PRIVATE_KEY_LOCATION` y `JWT_PUBLIC_KEY_LOCATION`.
+
+#### Recomendaciones pendientes (no implementadas)
+
+1. **Rate limiting distribuido con Redis** — el actual es por instancia JVM, no funciona en despliegues multi-réplica
+2. **Caducidad de tokens de activación** — añadir `activationTokenExpiresAt` en `User`, actualmente son indefinidos
+3. **Log de auditoría** — registrar login, cambios de estado de adopción, desactivaciones
+4. **HTTPS entre microservicios** en producción
+5. **JWKS endpoint** para rotación de claves JWT sin interrumpir sesiones activas
+6. **Imágenes Docker con usuario no root** — `quarkus.jib.user=1001`
+7. **OWASP Dependency Check + Trivy** en el pipeline de CI
+8. **Política de complejidad de contraseñas** — actualmente solo `@Size(min=8)`
+
+#### Tests tras las correcciones
+```
+42 tests unitarios — BUILD SUCCESS (auth-service, user-service, cat-service, adoption-service)
+```
 
 ---
 
