@@ -117,6 +117,12 @@
 
     <profiles>
         <profile>
+            <id>e2e</id>
+            <modules>
+                <module>e2e-tests</module>
+            </modules>
+        </profile>
+        <profile>
             <id>native</id>
             <activation>
                 <property>

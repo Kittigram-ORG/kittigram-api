@@ -17,5 +17,8 @@ target/
 .DS_Store
 Thumbs.db
 
+# Environment — copy .env.example, never commit real values
+.env
+
 # RSA keys — generate locally, never commit
 *.pem

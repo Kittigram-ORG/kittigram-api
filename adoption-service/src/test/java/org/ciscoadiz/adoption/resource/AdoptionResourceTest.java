@@ -34,7 +34,7 @@ class AdoptionResourceTest {
     }
 
     @Test
-    @TestSecurity(user = "1", roles = "user")
+    @TestSecurity(user = "1", roles = "User")
     @JwtSecurity(claims = {
             @Claim(key = "sub", value = "1"),
             @Claim(key = "email", value = "test@kittigram.org")
@@ -67,7 +67,7 @@ class AdoptionResourceTest {
     }
 
     @Test
-    @TestSecurity(user = "1", roles = "user")
+    @TestSecurity(user = "1", roles = "User")
     @JwtSecurity(claims = {
             @Claim(key = "sub", value = "1"),
             @Claim(key = "email", value = "test@kittigram.org")
@@ -81,7 +81,7 @@ class AdoptionResourceTest {
     }
 
     @Test
-    @TestSecurity(user = "100", roles = "user")
+    @TestSecurity(user = "100", roles = "User")
     @JwtSecurity(claims = {
             @Claim(key = "sub", value = "100"),
             @Claim(key = "email", value = "adopter@kittigram.org")
@@ -96,7 +96,7 @@ class AdoptionResourceTest {
     }
 
     @Test
-    @TestSecurity(user = "200", roles = "user")
+    @TestSecurity(user = "200", roles = "Organization")
     @JwtSecurity(claims = {
             @Claim(key = "sub", value = "200"),
             @Claim(key = "email", value = "org@kittigram.org")
@@ -111,7 +111,7 @@ class AdoptionResourceTest {
     }
 
     @Test
-    @TestSecurity(user = "1", roles = "user")
+    @TestSecurity(user = "1", roles = "Organization")
     @JwtSecurity(claims = {
             @Claim(key = "sub", value = "1"),
             @Claim(key = "email", value = "test@kittigram.org")
@@ -132,7 +132,33 @@ class AdoptionResourceTest {
     }
 
     @Test
-    @TestSecurity(user = "1", roles = "user")
+    @TestSecurity(user = "1", roles = "User")
+    @JwtSecurity(claims = {
+            @Claim(key = "sub", value = "1"),
+            @Claim(key = "email", value = "adopter@kittigram.org")
+    })
+    void testFindByIdAccessibleByAdopter() {
+        Integer id = given()
+                .contentType(ContentType.JSON)
+                .body("""
+                { "catId": 77, "organizationId": 2 }
+                """)
+                .when()
+                .post("/adoptions")
+                .then()
+                .statusCode(201)
+                .extract().path("id");
+
+        given()
+                .when()
+                .get("/adoptions/" + id)
+                .then()
+                .statusCode(200)
+                .body("adopterId", equalTo(1));
+    }
+
+    @Test
+    @TestSecurity(user = "1", roles = "User")
     @JwtSecurity(claims = {
             @Claim(key = "sub", value = "1"),
             @Claim(key = "email", value = "test@kittigram.org")

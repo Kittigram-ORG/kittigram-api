@@ -10,6 +10,7 @@ import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.ciscoadiz.notification.event.UserRegisteredEvent;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.eclipse.microprofile.reactive.messaging.Incoming;
 
 @ApplicationScoped
@@ -21,6 +22,9 @@ public class UserRegisteredConsumer {
     @Inject
     ObjectMapper objectMapper;
 
+    @ConfigProperty(name = "app.frontend.url", defaultValue = "http://localhost:5173")
+    String frontendUrl;
+
     @Inject
     @Location("emails/activation")
     Template activationTemplate;
@@ -31,7 +35,7 @@ public class UserRegisteredConsumer {
             UserRegisteredEvent event = objectMapper.readValue(message, UserRegisteredEvent.class);
             Log.infof("Sending activation email to %s", event.email());
 
-            String activationUrl = "http://localhost:8080/api/users/activate?token=" + event.activationToken();
+            String activationUrl = frontendUrl + "/activate?token=" + event.activationToken();
 
             String html = activationTemplate
                     .data("name", event.name())

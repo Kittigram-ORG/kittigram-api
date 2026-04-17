@@ -1,7 +1,6 @@
 package org.ciscoadiz.auth.service;
 
 import io.quarkus.hibernate.reactive.panache.common.WithTransaction;
-import io.quarkus.logging.Log;
 import io.smallrye.jwt.build.Jwt;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -43,13 +42,12 @@ public class AuthService {
                                 new InvalidCredentialsException()
                         );
                     }
-                    return generateTokens(response.getUserId(), response.getEmail());
+                    return generateTokens(response.getUserId(), response.getEmail(), response.getRole());
                 });
     }
 
     @WithTransaction
     public Uni<AuthResponse> refresh(RefreshRequest request) {
-        Log.infof("Refresh request token: '%s'", request.refreshToken());
         return refreshTokenRepository.findByToken(request.refreshToken())
                 .onItem().ifNull()
                 .failWith(() -> new InvalidTokenException("Refresh token not found"))
@@ -59,7 +57,9 @@ public class AuthService {
                                 new InvalidTokenException("Refresh token expired or revoked")
                         );
                     }
-                    return generateTokens(token.userId, token.email);
+                    token.revoked = true;
+                    return refreshTokenRepository.persist(token)
+                            .onItem().transformToUni(t -> generateTokens(t.userId, t.email, t.role));
                 });
     }
 
@@ -74,13 +74,14 @@ public class AuthService {
                 });
     }
 
-    private Uni<AuthResponse> generateTokens(long userId, String email) {
-        String accessToken = jwtTokenService.generateAccessToken(userId, email);
+    private Uni<AuthResponse> generateTokens(long userId, String email, String role) {
+        String accessToken = jwtTokenService.generateAccessToken(userId, email, role);
 
         RefreshToken refreshToken = new RefreshToken();
         refreshToken.token = UUID.randomUUID().toString();
         refreshToken.userId = userId;
         refreshToken.email = email;
+        refreshToken.role = role;
         refreshToken.expiresAt = LocalDateTime.now().plusDays(7);
 
         return refreshTokenRepository.persist(refreshToken)
