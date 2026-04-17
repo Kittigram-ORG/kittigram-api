@@ -8,6 +8,7 @@ import jakarta.inject.Inject;
 import jakarta.validation.Valid;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.*;
+import org.ciscoadiz.user.dto.ActivationRequest;
 import org.ciscoadiz.user.dto.UserCreateRequest;
 import org.ciscoadiz.user.dto.UserResponse;
 import org.ciscoadiz.user.dto.UserUpdateRequest;
@@ -74,10 +75,11 @@ public class UserResource {
                 .onItem().transform(user -> Response.ok(user).build());
     }
 
-    @GET
+    @POST
     @Path("/activate")
-    public Uni<Response> activate(@QueryParam("token") String token) {
-        return userService.activateByToken(token)
+    @PermitAll
+    public Uni<Response> activate(@Valid ActivationRequest request) {
+        return userService.activateByToken(request.token())
                 .onItem().transform(user -> Response.ok(user).build());
     }
 
