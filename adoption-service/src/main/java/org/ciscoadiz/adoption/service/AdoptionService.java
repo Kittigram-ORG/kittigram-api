@@ -61,10 +61,11 @@ public class AdoptionService {
     }
 
     @WithSession
-    public Uni<AdoptionRequestResponse> findById(Long id) {
+    public Uni<AdoptionRequestResponse> findById(Long id, Long callerId) {
         return adoptionRequestRepository.findById(id)
                 .onItem().ifNull()
                 .failWith(() -> new AdoptionRequestNotFoundException(id))
+                .onItem().invoke(adoption -> requireParticipant(adoption, callerId))
                 .onItem().transform(adoptionMapper::toResponse);
     }
 
@@ -234,6 +235,12 @@ public class AdoptionService {
                 form.anyoneHasAllergies,
                 form.allergiesDetail
         );
+    }
+
+    private void requireParticipant(AdoptionRequest adoption, Long callerId) {
+        if (!adoption.adopterId.equals(callerId) && !adoption.organizationId.equals(callerId)) {
+            throw new ForbiddenException("Access denied");
+        }
     }
 
     private void requireAdopter(AdoptionRequest adoption, Long adopterId) {

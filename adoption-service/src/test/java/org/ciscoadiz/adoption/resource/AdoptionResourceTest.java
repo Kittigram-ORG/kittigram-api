@@ -135,6 +135,32 @@ class AdoptionResourceTest {
     @TestSecurity(user = "1", roles = "user")
     @JwtSecurity(claims = {
             @Claim(key = "sub", value = "1"),
+            @Claim(key = "email", value = "adopter@kittigram.org")
+    })
+    void testFindByIdAccessibleByAdopter() {
+        Integer id = given()
+                .contentType(ContentType.JSON)
+                .body("""
+                { "catId": 77, "organizationId": 2 }
+                """)
+                .when()
+                .post("/adoptions")
+                .then()
+                .statusCode(201)
+                .extract().path("id");
+
+        given()
+                .when()
+                .get("/adoptions/" + id)
+                .then()
+                .statusCode(200)
+                .body("adopterId", equalTo(1));
+    }
+
+    @Test
+    @TestSecurity(user = "1", roles = "user")
+    @JwtSecurity(claims = {
+            @Claim(key = "sub", value = "1"),
             @Claim(key = "email", value = "test@kittigram.org")
     })
     void testSubmitRequestFormNotFound() {
