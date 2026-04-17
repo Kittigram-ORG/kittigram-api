@@ -2,7 +2,6 @@ package org.ciscoadiz.user.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import org.ciscoadiz.user.entity.UserRole;
 
@@ -15,5 +14,5 @@ public record UserCreateRequest(
         @NotBlank String surname,
         LocalDate birthdate,
         String status,
-        @NotNull UserRole role
+        UserRole role
 ) { }
