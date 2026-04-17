@@ -106,17 +106,42 @@ class AdoptionServiceTest {
     }
 
     @Test
-    void findById_exists_returnsResponse() {
+    void findById_adopter_returnsResponse() {
         when(adoptionRequestRepository.findById(1L))
                 .thenReturn(Uni.createFrom().item(testAdoptionRequest));
         when(adoptionMapper.toResponse(testAdoptionRequest))
                 .thenReturn(testAdoptionRequestResponse);
 
-        var result = adoptionService.findById(1L)
+        var result = adoptionService.findById(1L, 100L)
                 .await().indefinitely();
 
         assertNotNull(result);
         assertEquals(1L, result.id());
+    }
+
+    @Test
+    void findById_organization_returnsResponse() {
+        when(adoptionRequestRepository.findById(1L))
+                .thenReturn(Uni.createFrom().item(testAdoptionRequest));
+        when(adoptionMapper.toResponse(testAdoptionRequest))
+                .thenReturn(testAdoptionRequestResponse);
+
+        var result = adoptionService.findById(1L, 200L)
+                .await().indefinitely();
+
+        assertNotNull(result);
+        assertEquals(1L, result.id());
+    }
+
+    @Test
+    void findById_thirdParty_throwsForbiddenException() {
+        when(adoptionRequestRepository.findById(1L))
+                .thenReturn(Uni.createFrom().item(testAdoptionRequest));
+
+        assertThrows(ForbiddenException.class, () ->
+                adoptionService.findById(1L, 999L)
+                        .await().indefinitely()
+        );
     }
 
     @Test
@@ -125,7 +150,7 @@ class AdoptionServiceTest {
                 .thenReturn(Uni.createFrom().nullItem());
 
         assertThrows(AdoptionRequestNotFoundException.class, () ->
-                adoptionService.findById(999L)
+                adoptionService.findById(999L, 100L)
                         .await().indefinitely()
         );
     }

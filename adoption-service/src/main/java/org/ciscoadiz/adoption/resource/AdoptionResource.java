@@ -35,7 +35,8 @@ public class AdoptionResource {
     @GET
     @Path("/{id}")
     public Uni<AdoptionRequestResponse> findById(@PathParam("id") Long id) {
-        return adoptionService.findById(id);
+        Long callerId = Long.parseLong(jwt.getSubject());
+        return adoptionService.findById(id, callerId);
     }
 
     @GET
