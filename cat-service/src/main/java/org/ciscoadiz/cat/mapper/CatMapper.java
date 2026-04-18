@@ -28,15 +28,15 @@ public class CatMapper {
     }
 
     public void updateEntity(Cat cat, CatUpdateRequest request) {
-        cat.name = request.name();
-        cat.age = request.age();
-        cat.description = request.description();
-        cat.neutered = request.neutered() != null ? request.neutered() : cat.neutered;
-        cat.city = request.city();
-        cat.region = request.region();
-        cat.country = request.country();
-        cat.latitude = request.latitude();
-        cat.longitude = request.longitude();
+        if (request.name() != null) cat.name = request.name();
+        if (request.age() != null) cat.age = request.age();
+        if (request.description() != null) cat.description = request.description();
+        if (request.neutered() != null) cat.neutered = request.neutered();
+        if (request.city() != null) cat.city = request.city();
+        if (request.region() != null) cat.region = request.region();
+        if (request.country() != null) cat.country = request.country();
+        if (request.latitude() != null) cat.latitude = request.latitude();
+        if (request.longitude() != null) cat.longitude = request.longitude();
     }
 
     public CatResponse toResponse(Cat cat, List<CatImage> images) {
