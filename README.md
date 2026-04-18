@@ -455,7 +455,11 @@ Copy `.env.example` to `.env` and fill in all values. Variables marked **require
 
 ## Roadmap
 
-### Core
+> **Business model**: Kittigram is B2B2C — shelters are the paying customer, adopters are the end user. The shelter dashboard and workflow tooling are the core product; the adoption portal is the channel that gives shelters value.
+
+---
+
+### Priority 1 — Foundation (prerequisite for everything)
 
 - [x] All services implemented with full adoption workflow
 - [x] Integration and unit tests for all services (113 total)
@@ -464,26 +468,38 @@ Copy `.env.example` to `.env` and fill in all values. Variables marked **require
 - [x] Security audit completed (11 vulnerabilities found and fixed, score 5.5 → 8.5/10)
 - [x] JaCoCo configured across all modules (quarkus-jacoco + maven plugin in root pom)
 - [x] gateway-service instruction coverage at 100% (574/574); branch coverage 93.5% (4 unreachable branches in Vert.x WebClient code)
+- [ ] **CI/CD with GitHub Actions** — no pipeline exists; tests only run locally. Minimum: compile + test on push, JaCoCo report as PR artifact, OWASP Dependency Check + Trivy.
 - [ ] **Flyway** — versioned SQL migrations per service, `migrate-at-start=true`, Hibernate in `validate` mode in production. Pattern to be defined in `user-service` first.
-- [ ] **payment-service** — Stripe Connect for marketplace payments, Stripe Subscriptions for recurring billing, Quartz for reconciliation jobs.
+- [ ] **Production Docker Compose** — prerequisite for any real deployment.
+- [ ] **Observability** — OpenTelemetry distributed traces, metrics, and centralized logs. No correlation IDs between services today; debugging a gateway → auth → adoption flow requires grepping logs manually.
+- [ ] **Coverage baselines for remaining modules** — JaCoCo is installed; run `mvn test -pl <module>` and review `target/site/jacoco/index.html` per service.
 
-### Communication
+### Priority 2 — Shelter Dashboard (core revenue)
 
-- [ ] **chat-service** — real-time WebSocket (org ↔ adopter), persistent history, typing indicators, read receipts. File attachments via `storage-service` in the future.
-- [ ] **notification-service** — wire to adoption and chat events via Kafka.
+Shelters distrust platforms that automate them out of control. The value proposition is giving them better tools to manage their own work, not replacing it. This is what justifies a subscription.
 
-### Intelligence
+- [ ] Shelter management dashboard — adoption pipeline view, cat inventory, case history per animal.
+- [ ] Multi-user per shelter — shelter admin can invite volunteers with limited roles.
+- [ ] Shelter analytics — adoption rates, average time to adopt, rejection reasons.
+- [ ] Post-adoption follow-up — shelter requests updates (photos, health status) from adopters.
+- [ ] Post-adoption ratings — adopter rates shelter and vice versa.
+- [ ] **payment-service** — Stripe Connect for marketplace payments, Stripe Subscriptions for recurring billing, Quartz for reconciliation jobs. Introduce only once at least one shelter is willing to pay.
+- [ ] Extensible pricing (freemium tier for small shelters, paid tiers for volume and analytics).
 
-- [ ] **form-analysis-service** — LLM-based screening form analysis.
+### Priority 3 — Intelligence
 
-### Growth
+- [ ] **form-analysis-service** — LLM-based screening form analysis. Architecture (async Kafka + external call) is already in place; the engine swap is the only change needed.
+
+### Priority 4 — Communication
+
+- [ ] **Notifications MVP** — extend `notification-service` to cover all adoption state transitions (already partially wired). Shelters and adopters receive email on every status change. This is sufficient for MVP.
+- [ ] **chat-service** (V2) — real-time WebSocket channel (org ↔ adopter), persistent history. Implemented as a separate service given its different connection model. Prioritize only once in-app communication is a validated pain point over email/WhatsApp.
+
+### Priority 5 — Adopter Growth
 
 - [ ] Senior cat program.
 - [ ] Sponsorship program — recurring payments for people who cannot adopt.
-- [ ] Post-adoption ratings — adopter rates shelter and vice versa.
-- [ ] Post-adoption follow-up — shelter requests updates (photos, health status) after adoption.
-- [ ] B2B2C — shelter and veterinary management software (freemium model).
-- [ ] Extensible pricing.
+- [ ] **kittigram-cli** — Quarkus + Picocli native binary. Useful once operational complexity justifies it.
 
 ### Security
 
@@ -496,8 +512,8 @@ Copy `.env.example` to `.env` and fill in all values. Variables marked **require
 - [x] Activation token moved from query param to POST body
 - [x] Credentials removed from docker-compose (`.env` + `.env.example`)
 - [x] JWT keys externalized in `%prod` profile (mounted secrets, not classpath)
-- [ ] Rate limiting distributed with Redis (current limit is per JVM instance; multi-replica deployments multiply the effective limit)
-- [ ] **Fix `IpRateLimiter` cross-endpoint bucket sharing** — login (email key), refresh, and upload (IP key) share the same `Deque<Long>` per key; two uploads consume from the same window as two refreshes for the same IP
+- [ ] **Fix `IpRateLimiter` cross-endpoint bucket sharing** — refresh and upload (IP key) share the same `Deque<Long>`; two uploads consume from the same window as two refreshes for the same IP.
+- [ ] Rate limiting distributed with Redis — current limit is per JVM instance; multi-replica deployments multiply the effective limit.
 - [ ] Activation token expiry (`activationTokenExpiresAt`)
 - [ ] Audit log for sensitive actions (login, status changes)
 - [ ] HTTPS between services in production
@@ -505,21 +521,12 @@ Copy `.env.example` to `.env` and fill in all values. Variables marked **require
 - [ ] Docker images run as non-root (`quarkus.jib.user=1001`)
 - [ ] OWASP Dependency Check + Trivy in CI
 
-### Technical
+### Technical debt
 
 - [ ] **HTTPS** in gateway.
-- [ ] **Observability** — OpenTelemetry distributed traces, metrics, and centralized logs. No correlation IDs exist between services today; debugging a gateway → auth → adoption flow requires grepping logs manually.
-- [ ] **Coverage baselines for remaining modules** — JaCoCo is now installed; run `mvn test -pl <module>` and review `target/site/jacoco/index.html` per service to establish baselines.
-- [ ] **CI/CD with GitHub Actions** — no pipeline exists; tests only run locally. Priority: compile + test on push, JaCoCo report as PR artifact, OWASP Dependency Check + Trivy.
-- [ ] **kittigram-cli** — Quarkus + Picocli compiled to a native binary with GraalVM. Use cases: dev service launcher, stack installer, module scaffolding, health checks, migration generation.
 - [ ] Value Objects for remaining services.
 - [ ] Repository interfaces as ports (DIP) across all services.
 - [ ] Pagination on cat listing.
-- [ ] Production Docker Compose.
-
-### Long term
-
-- [ ] Blockchain for veterinary medical records (requires legal analysis Spain/EU).
 
 ---
 
