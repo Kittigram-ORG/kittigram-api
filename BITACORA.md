@@ -298,6 +298,60 @@ when(templateInstance.data(anyString(), any())).thenReturn(templateInstance);
 when(templateInstance.render()).thenReturn(Uni.createFrom().item("<html>..."));
 ```
 
+### 23. Rate limiter e2e: bucket de IP contaminado entre ejecuciones
+**Problema**: Los tests e2e de upload fallaban con 429 en la primera petición de una nueva ejecución. `IpRateLimiter` usa `X-Forwarded-For` como clave de bucket. La ejecución anterior (test de rate limit, Order 6) llenaba el bucket dentro de la ventana de 60 s. La siguiente ejecución usaba la misma IP real (`127.0.0.1`) → todos los uploads siguientes devolvían 429 sin llegar al upstream.
+
+**Solución**: Definir `static final String TEST_IP = "test-" + System.currentTimeMillis()` en la clase de test y enviarlo como header `X-Forwarded-For` en cada request que consuma del mismo bucket de rate limit. El gateway lee este header con prioridad sobre la IP del socket.
+
+```java
+private static final String TEST_IP = "test-" + System.currentTimeMillis();
+
+given()
+    .header("X-Forwarded-For", TEST_IP)
+    .header("Authorization", "Bearer " + token)
+    .multiPart("file", ...)
+    .post("/api/storage/upload");
+```
+
+### 24. MinIO oficial no auto-crea buckets con MINIO_DEFAULT_BUCKETS
+**Problema**: `minio/minio:latest` ignora la variable `MINIO_DEFAULT_BUCKETS`. Esta es una feature de `bitnami/minio`, no de la imagen oficial. El `storage-service` devolvía 500 en todos los uploads válidos porque el bucket no existía: el `S3AsyncClient` lanzaba `NoSuchBucketException` → `GlobalExceptionMapper` → HTTP 500.
+
+**Nota**: los uploads con tipo inválido devolvían 400 correctamente porque la validación de tipo se hace antes de llamar a S3.
+
+**Solución**: Añadir `BucketInitializer` con `@Observes StartupEvent` que hace `headBucket` y si recibe `NoSuchBucketException` crea el bucket con `createBucket`. Se usa `.get()` bloqueante porque el evento de startup es síncrono.
+
+```java
+@ApplicationScoped
+public class BucketInitializer {
+    @Inject S3AsyncClient s3;
+    @ConfigProperty(name = "bucket.name") String bucketName;
+
+    void onStart(@Observes StartupEvent ev) {
+        try {
+            s3.headBucket(HeadBucketRequest.builder().bucket(bucketName).build()).get();
+        } catch (ExecutionException e) {
+            if (e.getCause() instanceof NoSuchBucketException) {
+                s3.createBucket(CreateBucketRequest.builder().bucket(bucketName).build()).get();
+            }
+        } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+    }
+}
+```
+
+### 25. Quarkus dev cwd = directorio del módulo, no la raíz del proyecto
+**Problema**: Al arrancar con `mvn compile quarkus:dev -pl storage-service -am` desde la raíz, el proceso Java del servicio corre con `cwd = storage-service/`. Quarkus carga el `.env` del `cwd`, no de la raíz del proyecto. Los defaults de `application.properties` usaban `${MINIO_ROOT_PASSWORD:kittigram123}` pero el `.env` raíz tenía `MINIO_ROOT_PASSWORD=change_me_min16chars`. El `S3AsyncClient` fallaba en auth (403 silencioso de MinIO) → `S3Exception` → `GlobalExceptionMapper` → HTTP 500 en todos los uploads.
+
+**Diagnóstico**: la health check `GET /q/health/live` también devolvía 500 (con el formato del `GlobalExceptionMapper`) porque el módulo `quarkus-smallrye-health` no estaba en el POM del `storage-service`, por lo que la ruta `/q/health/live` no estaba registrada y lanzaba `NotFoundException` → capturada por `ExceptionMapper<Throwable>`.
+
+**Solución**:
+1. Symlink: `ln -sf ../.env storage-service/.env` (gitignored por la regla `.env` en `.gitignore` raíz).
+2. Actualizar el default de `application.properties` para que coincida con el valor del `.env` de referencia:
+```properties
+quarkus.s3.aws.credentials.static-provider.secret-access-key=${MINIO_ROOT_PASSWORD:change_me_min16chars}
+```
+
+El symlink es la solución duradera: Quarkus encuentra el `.env` en su `cwd` y carga las credenciales reales. El default actualizado actúa como fallback para entornos sin el symlink. Si en el futuro se añade otro servicio con credenciales externas, aplicar el mismo patrón.
+
 ### 8. PanacheRepository no tiene stream() en modo reactivo
 **Problema**: `find("catId", catId).stream()` no compila — `stream()` no existe en `PanacheQuery` reactivo.
 
@@ -510,15 +564,15 @@ quarkus.s3.path-style-access=true
 quarkus.s3.aws.region=us-east-1
 quarkus.s3.aws.credentials.type=static
 quarkus.s3.aws.credentials.static-provider.access-key-id=${MINIO_ROOT_USER:kittigram}
-quarkus.s3.aws.credentials.static-provider.secret-access-key=${MINIO_ROOT_PASSWORD:kittigram123}
+quarkus.s3.aws.credentials.static-provider.secret-access-key=${MINIO_ROOT_PASSWORD:change_me_min16chars}
 bucket.name=${MINIO_DEFAULT_BUCKETS:kittigram}
 quarkus.s3.async-client.type=netty
 ```
 
 **Notas importantes**:
-- El bucket MinIO debe estar en modo **público** o usar URLs prefirmadas
+- El bucket MinIO se crea automáticamente al arrancar el servicio via `BucketInitializer` (`@Observes StartupEvent`). `minio/minio:latest` NO crea buckets via `MINIO_DEFAULT_BUCKETS` — eso es una feature de `bitnami/minio`.
+- El symlink `storage-service/.env → ../.env` es necesario en dev porque Quarkus carga el `.env` desde el `cwd` del proceso, que es el directorio del módulo, no la raíz del proyecto.
 - Para producción: Cloudflare R2 (sin egress), compatible con API S3
-- Para dev: MinIO en Docker
 - Las URLs son permanentes (el contenido es público por naturaleza)
 - `@MultipartForm` está deprecado en Quarkus REST reactivo, usar `@RestForm` directamente
 
@@ -1572,6 +1626,34 @@ docker exec -it kittigram-postgres-1 psql -U kittigram -d kittigram -c "\dt cats
 - GitKraken AI configurado (250k tokens/semana, Gemini Flash) con Conventional Commits y Commit Composer.
 
 **Estado al cierre**: 53 tests en total (20 integración + 33 unitarios) distribuidos en 6 servicios.
+---
+
+### Sesión 2026-04-18
+
+**Contexto**: corrección de la suite e2e de `storage-service` (6 tests, todos fallaban).
+
+**Bloque 1 — Rate limiter contaminando ejecuciones e2e**
+- El test `upload_rateLimitExceeded_returns429` (Order 6) llenaba el bucket de IP dentro de la ventana de 60 s. La siguiente ejecución encontraba el bucket lleno y fallaba con 429 desde el primer upload.
+- Fix: añadir `X-Forwarded-For: TEST_IP` (único por ejecución, generado con `System.currentTimeMillis()`) a todos los requests de upload en `StorageE2E`. El gateway lee `X-Forwarded-For` con prioridad sobre la IP del socket (ver Problema #23).
+
+**Bloque 2 — 500 en upload válido: credenciales MinIO incorrectas**
+- Con el rate limiter corregido, el test 1 (upload JPEG) devolvía 500. Los tests 2 (serve) y 5 (delete) dependían del test 1 y también fallaban. El test 4 (tipo inválido → 400) pasaba porque la validación de tipo ocurre antes de llamar a S3.
+- Causa raíz: doble problema encadenado:
+  1. **MinIO no crea el bucket automáticamente** con `MINIO_DEFAULT_BUCKETS` en la imagen oficial — el bucket `kittigram` no existía (ver Problema #24).
+  2. **Credenciales incorrectas**: el proceso Quarkus de `storage-service` corre con `cwd = storage-service/` y no carga el `.env` raíz. Usaba el default `kittigram123` pero MinIO esperaba `change_me_min16chars` (ver Problema #25).
+- Fixes aplicados:
+  - Symlink `storage-service/.env → ../.env` para que Quarkus cargue las credenciales reales.
+  - Default de `MINIO_ROOT_PASSWORD` actualizado en `application.properties` a `change_me_min16chars`.
+  - `BucketInitializer` (`@Observes StartupEvent`) que crea el bucket si no existe, usando `S3AsyncClient.get()` bloqueante.
+- El bucket existente en MinIO se creó manualmente con `docker exec kittigram-minio-1 mc mb local/kittigram`. Quarkus recargó `application.properties` automáticamente en dev mode (hot reload).
+
+**Bloque 3 — Actualización de documentación**
+- `CLAUDE.md`: tres gotchas nuevos (rate limit e2e, MinIO sin auto-bucket, Quarkus dev cwd).
+- `BITACORA.md` y `README.md`: problemas #23–25 documentados, sección storage-service y guía de setup actualizadas.
+- Memorias de Claude Code actualizadas con los aprendizajes de infraestructura.
+
+**Estado al cierre**: 6/6 tests de `StorageE2E` verdes. Stack completo operativo.
+
 ---
 
 ### Sesión 2026-04-17

@@ -256,9 +256,17 @@ docker compose up -d
 
 Starts PostgreSQL, MinIO, Kafka, Zookeeper, and MailHog. Schemas are created automatically by `init.sql` on first run. The `.env` file is git-ignored; never commit it.
 
+> **MinIO bucket**: `minio/minio:latest` does not auto-create buckets from `MINIO_DEFAULT_BUCKETS` (that is a `bitnami/minio` feature). `storage-service` creates the bucket automatically via `BucketInitializer` on startup — no manual action required.
+
 ### Running services
 
 Use `dev.sh` in the repository root to start services in Quarkus dev mode. Each service runs with `-am` so Maven builds reactor dependencies without a prior `mvn install`.
+
+> **storage-service credential note**: Quarkus dev mode runs with the module directory as its working directory, so the root `.env` is not loaded automatically. A symlink fixes this — run once after cloning:
+> ```bash
+> ln -sf ../.env storage-service/.env
+> ```
+> The symlink is git-ignored.
 
 ```bash
 # Start all services
@@ -329,6 +337,22 @@ Unit tests use plain Mockito (`@ExtendWith(MockitoExtension.class)`), no contain
 | form-analysis-service | 8    | 3           | Rules engine + in-memory Kafka                       |
 
 **Total: 93 tests** (58 unit + 35 integration)
+
+**End-to-end tests** run against the full live stack (all services + Docker infra):
+
+| Suite              | Tests | Coverage |
+|--------------------|-------|----------|
+| `StorageE2E`       | 6     | Upload JPEG, serve public, 401, 400 invalid type, delete, rate limit 429 |
+
+```bash
+# Run e2e suite (requires full stack running)
+mvn test -Pe2e -pl e2e-tests
+
+# Start full stack and run e2e automatically
+./dev.sh --e2e
+```
+
+**Rate-limit isolation in e2e tests**: tests that hit rate-limited endpoints must send a unique `X-Forwarded-For` header per test run (e.g. `"test-" + System.currentTimeMillis()`) to avoid bucket contamination between consecutive runs within the 60-second window.
 
 ```bash
 mvn verify -pl <service>
