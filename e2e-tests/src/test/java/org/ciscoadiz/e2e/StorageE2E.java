@@ -26,6 +26,10 @@ class StorageE2E {
             (byte) 0xFF, (byte) 0xD9
     };
 
+    // Unique per-run IP prevents the rate-limit bucket filled by the last test
+    // from bleeding into the next test run within the 60-second window.
+    private static final String TEST_IP = "test-" + TS;
+
     private static String token;
     private static String uploadedKey;
     private static String uploadedUrl;
@@ -55,6 +59,7 @@ class StorageE2E {
     void upload_validJpeg_returns200WithKeyAndUrl() {
         var response = given()
             .header("Authorization", "Bearer " + token)
+            .header("X-Forwarded-For", TEST_IP)
             .multiPart("file", "test.jpg", TINY_JPEG, "image/jpeg")
         .when()
             .post("/api/storage/upload")
@@ -95,6 +100,7 @@ class StorageE2E {
     void upload_invalidType_returns400() {
         given()
             .header("Authorization", "Bearer " + token)
+            .header("X-Forwarded-For", TEST_IP)
             .multiPart("file", "test.txt", "hello".getBytes(), "text/plain")
         .when()
             .post("/api/storage/upload")
@@ -121,6 +127,7 @@ class StorageE2E {
         for (int i = 0; i < 6; i++) {
             lastStatus = given()
                 .header("Authorization", "Bearer " + token)
+                .header("X-Forwarded-For", TEST_IP)
                 .multiPart("file", "rl.jpg", TINY_JPEG, "image/jpeg")
                 .post("/api/storage/upload")
                 .statusCode();
