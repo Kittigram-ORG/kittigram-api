@@ -331,12 +331,12 @@ Unit tests use plain Mockito (`@ExtendWith(MockitoExtension.class)`), no contain
 | auth-service          | 7    | 4           | `@InjectMock` on gRPC client                         |
 | cat-service           | 9    | 5           | JWT test tokens via `quarkus-smallrye-jwt-build`     |
 | storage-service       | 6    | 2           | Real MinIO via `QuarkusTestResourceLifecycleManager` |
-| gateway-service       | —    | 4           | WireMock 1.6.1 DevService                            |
+| gateway-service       | 2    | 22          | WireMock 1.6.1 DevService; Mockito para unit tests   |
 | notification-service  | 3    | 2           | MockMailbox + in-memory Kafka + Awaitility           |
 | adoption-service      | 17   | 9           | RBAC + ownership checks covered                      |
 | form-analysis-service | 8    | 3           | Rules engine + in-memory Kafka                       |
 
-**Total: 93 tests** (58 unit + 35 integration)
+**Total: 113 tests** (60 unit + 53 integration)
 
 **End-to-end tests** run against the full live stack (all services + Docker infra):
 

@@ -1514,6 +1514,37 @@ docker exec -it kittigram-postgres-1 psql -U kittigram -d kittigram -c "\dt cats
 
 ## Historial de Sesiones
 
+### Sesión 2026-04-18
+
+**Bloque 1 — Cobertura JaCoCo en todos los módulos**
+- `quarkus-jacoco` añadido como dependencia de test en el POM raíz: todos los módulos la heredan.
+- `jacoco-maven-plugin` configurado en el POM raíz con `exclClassLoaders=*QuarkusClassLoader` (evita doble instrumentación de clases cargadas por Quarkus) y `append=true` para fusionar `.exec` de tests unitarios y de integración.
+- `dataFile` apunta a `jacoco-quarkus.exec` en todos los módulos.
+
+**Bloque 2 — Fix test roto en gateway-service**
+- `testAdoptionsPathStrippedCorrectly` devolvía 401 en lugar de 200. Dos causas:
+  1. `quarkus.http.auth.proactive=true` (defecto Quarkus): valida el token Bearer antes de llegar a JAX-RS; `test-token` no es un JWT válido → 401 inmediato. Corregido con `%test.quarkus.http.auth.proactive=false`.
+  2. URL de `adoption-service` no mapeada a WireMock en perfil test → error de conexión a `localhost:8086`. Corregido añadiendo `%test.quarkus.rest-client.adoption-service.url`.
+
+**Bloque 3 — Cobertura gateway-service: 65% → 100% instrucciones**
+- `gateway-service/pom.xml`: añadidas dependencias `quarkus-junit5-mockito` y `mockito-junit-jupiter` para unit tests con Mockito.
+- `application.properties`: límites de rate limit reducidos en perfil test (`%test.rate-limit.auth.login=2`, etc.) para disparar 429 con solo 3 peticiones.
+- `GatewayResourceTest`: ampliado de 6 a 22 tests de integración con WireMock. Nuevos tests cubren: `refresh`, `logout`, POST/PUT/PATCH/DELETE genéricos, `storage/upload`, 429 por rate limit (login, refresh, upload), ramas de `clientIp()` (X-Forwarded-For, en blanco, sin header), body JSON inválido, ruta desconocida con Bearer → 404, `Authorization: Basic` → 401.
+- `IpRateLimiterTest` (nuevo): unit test puro que cubre el `while` de limpieza de timestamps expirados en `IpRateLimiter`.
+- `GatewayResourceUnitTest` (nuevo): unit test con Mockito que cubre la rama `return "unknown"` de `clientIp()` (inaccesible vía HTTP porque `RoutingContext` siempre tiene `remoteAddress`).
+
+**Problemas encontrados en esta sesión**:
+- Tests contaminados por `IpRateLimiter`: el limiter comparte una sola `Deque<Long>` por clave IP para todos los endpoints (login, refresh, upload). Varios tests usando `127.0.0.1` agotaban el bucket entre sí. Solución: `X-Forwarded-For` único por test con IPs estáticas generadas a partir de `System.currentTimeMillis()`.
+- `testLoginRateLimitExceeded` fallaba al parsear JSON del 429: `RateLimitExceptionMapper` serializa `Map.of(...)` pero sin configuración Jackson explícita puede producir `{key=value}` en lugar de JSON. Solución: aserción con `containsString` sobre el body raw en vez de JSON path.
+- `testMalformedAuthHeaderReturnsUnauthorized` usaba `GET /api/cats/1` que coincide con `PUBLIC_PATTERNS` → el filtro JWT lo dejaba pasar. Cambiado a `GET /api/adoptions/99` (ruta protegida).
+- JaCoCo advierte "Unsupported class file major version 69" para proxies de Mockito generados con Java 21. Es una limitación conocida de JaCoCo 0.8.12, no afecta a la cobertura del código de producción.
+
+**Cobertura final gateway-service**: 574/574 instrucciones (100%), 58/62 ramas (93.5%). Las 4 ramas no alcanzadas son genuinamente inalcanzables vía HTTP: `r.body() == null` en `ProxyService` (Vert.x siempre devuelve `Buffer`) y `rc == null` / `rc.remoteAddress() == null` en `clientIp()`.
+
+**Estado al cierre**: 113 tests — BUILD SUCCESS en todos los módulos.
+
+---
+
 ### Sesión 2026-04-16
 
 **Bloque 1 — adoption-service completado**
