@@ -2,6 +2,7 @@ package org.ciscoadiz.user.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.quarkus.elytron.security.common.BcryptUtil;
+import io.quarkus.hibernate.reactive.panache.Panache;
 import io.quarkus.hibernate.reactive.panache.common.WithSession;
 import io.quarkus.hibernate.reactive.panache.common.WithTransaction;
 import io.quarkus.logging.Log;
@@ -48,12 +49,9 @@ public class UserService {
     }
 
     public Multi<UserResponse> findAllActiveUsers() {
-        return Multi.createFrom().uni(
-                        Uni.createFrom().deferred(() ->
-                                userRepository.findAllActiveUsers()
-                                        .collect().asList()
-                        )
-                ).flatMap(list -> Multi.createFrom().iterable(list))
+        return Panache.withSession(
+                () -> userRepository.findAllActiveUsers().collect().asList()
+        ).onItem().transformToMulti(list -> Multi.createFrom().iterable(list))
                 .onItem().transform(userMapper::toResponse);
     }
 
