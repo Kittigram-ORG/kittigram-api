@@ -37,7 +37,8 @@
         "mimeType": "application/json",
         "text": "{\n  \"email\": \"{{ _.user_email }}\",\n  \"password\": \"Password1!\"\n}"
       },
-      "headers": [{ "name": "Content-Type", "value": "application/json" }]
+      "headers": [{ "name": "Content-Type", "value": "application/json" }],
+      "afterResponseScript": "const response = insomnia.response.json();\ninsomnia.environment.set('access_token', response.accessToken);\ninsomnia.environment.set('refresh_token', response.refreshToken);"
     },
     {
       "_id": "req_refresh",
@@ -50,7 +51,8 @@
         "mimeType": "application/json",
         "text": "{\n  \"refreshToken\": \"{{ _.refresh_token }}\"\n}"
       },
-      "headers": [{ "name": "Content-Type", "value": "application/json" }]
+      "headers": [{ "name": "Content-Type", "value": "application/json" }],
+      "afterResponseScript": "const response = insomnia.response.json();\ninsomnia.environment.set('access_token', response.accessToken);\ninsomnia.environment.set('refresh_token', response.refreshToken);"
     },
     {
       "_id": "req_logout",
