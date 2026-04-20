@@ -13,7 +13,6 @@ public class FormAnalysisRules {
     public List<FlagResult> evaluate(AdoptionFormSubmittedEvent event) {
         List<FlagResult> flags = new ArrayList<>();
 
-        // CRITICAL flags
         if (containsPhysicalPunishment(event.reactionToUnwantedBehavior())) {
             flags.add(new FlagResult(
                     FlagSeverity.Critical,
@@ -47,7 +46,6 @@ public class FormAnalysisRules {
             ));
         }
 
-        // WARNING flags
         if (event.dailyPlayMinutes() != null && event.dailyPlayMinutes() < 15) {
             flags.add(new FlagResult(
                     FlagSeverity.Warning,
@@ -100,7 +98,6 @@ public class FormAnalysisRules {
             ));
         }
 
-        // NOTICE flags
         if (!Boolean.TRUE.equals(event.hasWindowsWithView())) {
             flags.add(new FlagResult(
                     FlagSeverity.Notice,

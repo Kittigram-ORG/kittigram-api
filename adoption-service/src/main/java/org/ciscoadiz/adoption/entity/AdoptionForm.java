@@ -12,7 +12,6 @@ public class AdoptionForm extends PanacheEntity {
     @Column(nullable = false)
     public Long adoptionRequestId;
 
-    // Datos personales verificados
     @Column(nullable = false)
     public String fullName;
 
@@ -31,7 +30,6 @@ public class AdoptionForm extends PanacheEntity {
     @Column(nullable = false)
     public String postalCode;
 
-    // Compromisos firmados
     @Column(nullable = false)
     public Boolean acceptsVetVisits;
 
@@ -44,7 +42,6 @@ public class AdoptionForm extends PanacheEntity {
     @Column(nullable = false)
     public Boolean acceptsTermsAndConditions;
 
-    // Información adicional para la organización
     @Column(columnDefinition = "TEXT")
     public String additionalNotes;
 

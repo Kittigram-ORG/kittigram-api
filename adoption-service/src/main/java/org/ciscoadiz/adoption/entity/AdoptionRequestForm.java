@@ -12,7 +12,6 @@ public class AdoptionRequestForm extends PanacheEntity {
     @Column(nullable = false)
     public Long adoptionRequestId;
 
-    // Sección 1: Perfil del adoptante
     @Column(nullable = false)
     public Boolean hasPreviousCatExperience;
 
@@ -43,7 +42,6 @@ public class AdoptionRequestForm extends PanacheEntity {
     @Column(columnDefinition = "TEXT")
     public String housingInstabilityReason;
 
-    // Sección 2: La vivienda
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     public HousingType housingType;
@@ -73,7 +71,6 @@ public class AdoptionRequestForm extends PanacheEntity {
     @Column(nullable = false)
     public ActivityLevel householdActivityLevel;
 
-    // Sección 3: Comprensión del comportamiento felino
     @Column(columnDefinition = "TEXT", nullable = false)
     public String whyCatsNeedToPlay;
 
@@ -92,7 +89,6 @@ public class AdoptionRequestForm extends PanacheEntity {
     @Column(nullable = false)
     public Boolean willingToEnrichEnvironment;
 
-    // Sección 4: Compromiso y expectativas
     @Column(columnDefinition = "TEXT", nullable = false)
     public String motivationToAdopt;
 
