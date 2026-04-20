@@ -174,6 +174,7 @@ src/main/java/org/ciscoadiz/<servicio>/
 ```
 
 ## Comportamiento esperado
+- **Antes de comenzar cualquier desarrollo**: crear una rama con el formato `<tipo>/<descripción>`, donde `<tipo>` sigue la convención de conventional commits (`feat`, `fix`, `chore`, `docs`, `refactor`, `test`). Ejemplos: `feat/flyway-migrations`, `fix/rate-limiter-bucket`.
 - **Compilar solo el módulo afectado**: `mvn compile -pl <módulo>` o `mvn test -pl <módulo>`.
 - **Tests e2e**: `mvn test -Pe2e -pl e2e-tests` (requiere stack completo corriendo).
 - **Si un fix falla dos veces seguidas por el mismo motivo → parar y preguntar al usuario.**
