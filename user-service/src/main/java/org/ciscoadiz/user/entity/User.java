@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 public class User extends PanacheEntity {
     @Column(nullable = false, unique = true)
     public String email;
-    @Column(nullable = false)
+    @Column(name = "password_hash", nullable = false)
     public String passwordHash;
     @Column(nullable = false)
     public String name;
@@ -26,13 +26,13 @@ public class User extends PanacheEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     public UserRole role;
-    @Column(unique = true)
+    @Column(name = "activation_token", unique = true)
     public String activationToken;
-    @Column
+    @Column(name = "activation_token_expires_at")
     public LocalDateTime activationTokenExpiresAt;
-    @Column(nullable = false, updatable = false )
+    @Column(name = "created_at", nullable = false, updatable = false)
     public LocalDateTime createdAt;
-    @Column(nullable = false)
+    @Column(name = "updated_at", nullable = false)
     public LocalDateTime updatedAt;
 
     @PrePersist
