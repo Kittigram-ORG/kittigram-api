@@ -92,7 +92,7 @@ Issues and rotates JWT tokens. Validates credentials via gRPC against `user-serv
 
 ---
 
-### cat-service — port 8083
+### cat-service — port 8084
 
 Cat profiles for adoption. Images are proxied through the gateway; bucket URLs are never exposed directly.
 
@@ -107,7 +107,7 @@ Cat profiles for adoption. Images are proxied through the gateway; bucket URLs a
 
 ---
 
-### storage-service — port 8084
+### storage-service — port 8083
 
 S3-compatible file storage. Backend is MinIO in development and Cloudflare R2 in production.
 
@@ -174,8 +174,8 @@ Three isolated networks. Only the gateway is reachable from the internet.
                         │                                             │
                         │  user-service        :8081  gRPC :9090      │
                         │  auth-service        :8082  gRPC :9091      │
-                        │  cat-service         :8083                  │
-                        │  storage-service     :8084                  │
+                        │  cat-service         :8084                  │
+                        │  storage-service     :8083                  │
                         │  notification-service :8085                 │
                         │  adoption-service    :8086                  │
                         └──────────────┬──────────────────────────────┘
@@ -198,8 +198,8 @@ Implemented via Docker networks (dev/staging) or Kubernetes NetworkPolicy (produ
 | gateway-service       | 8080  | —     |
 | user-service          | 8081  | 9090  |
 | auth-service          | 8082  | 9091  |
-| cat-service           | 8083  | —     |
-| storage-service       | 8084  | —     |
+| cat-service           | 8084  | —     |
+| storage-service       | 8083  | —     |
 | notification-service  | 8085  | —     |
 | adoption-service      | 8086  | —     |
 | PostgreSQL            | 5432  | —     |
