@@ -66,7 +66,7 @@ class AdoptionServiceTest {
         testAdoptionRequestResponse = new AdoptionRequestResponse(
                 1L, 10L, 100L, 200L,
                 AdoptionStatus.Pending, null, null,
-                "adopter@kittigram.org",
+                "adopter@kitti.es",
                 LocalDateTime.now(), LocalDateTime.now()
         );
     }
@@ -77,14 +77,14 @@ class AdoptionServiceTest {
 
         when(adoptionRequestRepository.existsActiveByCatId(10L))
                 .thenReturn(Uni.createFrom().item(false));
-        when(adoptionMapper.toEntity(request, 100L, "adopter@kittigram.org"))
+        when(adoptionMapper.toEntity(request, 100L, "adopter@kitti.es"))
                 .thenReturn(testAdoptionRequest);
         when(adoptionRequestRepository.persist(any(AdoptionRequest.class)))
                 .thenReturn(Uni.createFrom().item(testAdoptionRequest));
         when(adoptionMapper.toResponse(testAdoptionRequest))
                 .thenReturn(testAdoptionRequestResponse);
 
-        var result = adoptionService.createAdoptionRequest(request, 100L, "adopter@kittigram.org")
+        var result = adoptionService.createAdoptionRequest(request, 100L, "adopter@kitti.es")
                 .await().indefinitely();
 
         assertNotNull(result);
@@ -100,7 +100,7 @@ class AdoptionServiceTest {
                 .thenReturn(Uni.createFrom().item(true));
 
         assertThrows(CatNotAvailableException.class, () ->
-                adoptionService.createAdoptionRequest(request, 100L, "adopter@kittigram.org")
+                adoptionService.createAdoptionRequest(request, 100L, "adopter@kitti.es")
                         .await().indefinitely()
         );
     }

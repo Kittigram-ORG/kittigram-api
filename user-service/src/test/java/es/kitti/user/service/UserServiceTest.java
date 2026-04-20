@@ -48,14 +48,14 @@ class UserServiceTest {
     void setUp() {
         testUser = new User();
         testUser.id = 1L;
-        testUser.email = "test@kittigram.org";
+        testUser.email = "test@kitti.es";
         testUser.name = "Test";
         testUser.surname = "User";
         testUser.status = UserStatus.Pending;
         testUser.activationToken = "valid-token-123";
 
         testUserResponse = new UserResponse(
-                1L, "test@kittigram.org", "Test", "User",
+                1L, "test@kitti.es", "Test", "User",
                 UserStatus.Pending, UserRole.User,null,
                 LocalDateTime.now(), LocalDateTime.now()
         );
@@ -64,7 +64,7 @@ class UserServiceTest {
     @Test
     void createUser_success() {
         var request = new UserCreateRequest(
-                "test@kittigram.org",
+                "test@kitti.es",
                 "password123",
                 "Test",
                 "User",
@@ -86,7 +86,7 @@ class UserServiceTest {
                 .await().indefinitely();
 
         assertNotNull(result);
-        assertEquals("test@kittigram.org", result.email());
+        assertEquals("test@kitti.es", result.email());
         assertEquals(UserStatus.Pending, result.status());
         verify(userRegisteredEmitter).send(any(UserRegisteredEvent.class));
     }
@@ -94,7 +94,7 @@ class UserServiceTest {
     @Test
     void createUser_duplicateEmail_throwsIllegalArgumentException() {
         var request = new UserCreateRequest(
-                "duplicate@kittigram.org", "password123", "Test", "User", null, null, UserRole.User
+                "duplicate@kitti.es", "password123", "Test", "User", null, null, UserRole.User
         );
 
         when(userRepository.existsByEmail(request.email()))
@@ -109,25 +109,25 @@ class UserServiceTest {
 
     @Test
     void findByEmail_userExists_returnsResponse() {
-        when(userRepository.findByEmail("test@kittigram.org"))
+        when(userRepository.findByEmail("test@kitti.es"))
                 .thenReturn(Uni.createFrom().item(testUser));
         when(userMapper.toResponse(testUser))
                 .thenReturn(testUserResponse);
 
-        var result = userService.findByEmail("test@kittigram.org")
+        var result = userService.findByEmail("test@kitti.es")
                 .await().indefinitely();
 
         assertNotNull(result);
-        assertEquals("test@kittigram.org", result.email());
+        assertEquals("test@kitti.es", result.email());
     }
 
     @Test
     void findByEmail_userNotFound_throwsUserNotFoundException() {
-        when(userRepository.findByEmail("nonexistent@kittigram.org"))
+        when(userRepository.findByEmail("nonexistent@kitti.es"))
                 .thenReturn(Uni.createFrom().nullItem());
 
         assertThrows(UserNotFoundException.class, () ->
-                userService.findByEmail("nonexistent@kittigram.org")
+                userService.findByEmail("nonexistent@kitti.es")
                         .await().indefinitely()
         );
     }
@@ -140,7 +140,7 @@ class UserServiceTest {
                 .thenReturn(Uni.createFrom().item(testUser));
         when(userMapper.toResponse(testUser))
                 .thenReturn(new UserResponse(
-                        1L, "test@kittigram.org", "Test", "User",
+                        1L, "test@kitti.es", "Test", "User",
                         UserStatus.Active, UserRole.User,null,
                         LocalDateTime.now(),LocalDateTime.now()
                 ));
@@ -165,18 +165,18 @@ class UserServiceTest {
 
     @Test
     void deactivateUser_userExists_setsInactiveStatus() {
-        when(userRepository.findByEmail("test@kittigram.org"))
+        when(userRepository.findByEmail("test@kitti.es"))
                 .thenReturn(Uni.createFrom().item(testUser));
         when(userRepository.persist(any(User.class)))
                 .thenReturn(Uni.createFrom().item(testUser));
         when(userMapper.toResponse(testUser))
                 .thenReturn(new UserResponse(
-                        1L, "test@kittigram.org", "Test", "User",
+                        1L, "test@kitti.es", "Test", "User",
                         UserStatus.Inactive, UserRole.User,null,
                         LocalDateTime.now(), LocalDateTime.now()
                 ));
 
-        var result = userService.deactivateUser("test@kittigram.org")
+        var result = userService.deactivateUser("test@kitti.es")
                 .await().indefinitely();
 
         assertEquals(UserStatus.Inactive, result.status());
@@ -185,11 +185,11 @@ class UserServiceTest {
 
     @Test
     void deactivateUser_userNotFound_throwsUserNotFoundException() {
-        when(userRepository.findByEmail("nonexistent@kittigram.org"))
+        when(userRepository.findByEmail("nonexistent@kitti.es"))
                 .thenReturn(Uni.createFrom().nullItem());
 
         assertThrows(UserNotFoundException.class, () ->
-                userService.deactivateUser("nonexistent@kittigram.org")
+                userService.deactivateUser("nonexistent@kitti.es")
                         .await().indefinitely()
         );
     }

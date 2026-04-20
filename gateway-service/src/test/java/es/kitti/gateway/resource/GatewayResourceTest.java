@@ -51,7 +51,7 @@ class GatewayResourceTest {
                 .contentType(ContentType.JSON)
                 .body("""
                 {
-                    "email": "test@kittigram.org",
+                    "email": "test@kitti.es",
                     "password": "password123"
                 }
                 """)

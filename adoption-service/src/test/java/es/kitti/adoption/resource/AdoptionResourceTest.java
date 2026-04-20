@@ -37,7 +37,7 @@ class AdoptionResourceTest {
     @TestSecurity(user = "1", roles = "User")
     @JwtSecurity(claims = {
             @Claim(key = "sub", value = "1"),
-            @Claim(key = "email", value = "test@kittigram.org")
+            @Claim(key = "email", value = "test@kitti.es")
     })
     void testCreateAdoptionRequest() {
         given()
@@ -70,7 +70,7 @@ class AdoptionResourceTest {
     @TestSecurity(user = "1", roles = "User")
     @JwtSecurity(claims = {
             @Claim(key = "sub", value = "1"),
-            @Claim(key = "email", value = "test@kittigram.org")
+            @Claim(key = "email", value = "test@kitti.es")
     })
     void testFindByIdNotFoundAuthenticated() {
         given()
@@ -84,7 +84,7 @@ class AdoptionResourceTest {
     @TestSecurity(user = "100", roles = "User")
     @JwtSecurity(claims = {
             @Claim(key = "sub", value = "100"),
-            @Claim(key = "email", value = "adopter@kittigram.org")
+            @Claim(key = "email", value = "adopter@kitti.es")
     })
     void testFindMyAdoptions() {
         given()
@@ -99,7 +99,7 @@ class AdoptionResourceTest {
     @TestSecurity(user = "200", roles = "Organization")
     @JwtSecurity(claims = {
             @Claim(key = "sub", value = "200"),
-            @Claim(key = "email", value = "org@kittigram.org")
+            @Claim(key = "email", value = "org@kitti.es")
     })
     void testFindByOrganization() {
         given()
@@ -114,7 +114,7 @@ class AdoptionResourceTest {
     @TestSecurity(user = "1", roles = "Organization")
     @JwtSecurity(claims = {
             @Claim(key = "sub", value = "1"),
-            @Claim(key = "email", value = "test@kittigram.org")
+            @Claim(key = "email", value = "test@kitti.es")
     })
     void testUpdateStatusNotFound() {
         given()
@@ -135,7 +135,7 @@ class AdoptionResourceTest {
     @TestSecurity(user = "1", roles = "User")
     @JwtSecurity(claims = {
             @Claim(key = "sub", value = "1"),
-            @Claim(key = "email", value = "adopter@kittigram.org")
+            @Claim(key = "email", value = "adopter@kitti.es")
     })
     void testFindByIdAccessibleByAdopter() {
         Integer id = given()
@@ -161,7 +161,7 @@ class AdoptionResourceTest {
     @TestSecurity(user = "1", roles = "User")
     @JwtSecurity(claims = {
             @Claim(key = "sub", value = "1"),
-            @Claim(key = "email", value = "test@kittigram.org")
+            @Claim(key = "email", value = "test@kitti.es")
     })
     void testSubmitRequestFormNotFound() {
         given()

@@ -62,7 +62,7 @@ class CatResourceTest {
     @TestSecurity(user = "1", roles = "user")
     @JwtSecurity(claims = {
             @Claim(key = "sub", value = "1"),
-            @Claim(key = "email", value = "test@kittigram.org")
+            @Claim(key = "email", value = "test@kitti.es")
     })
     void testCreateCatAuthenticated() {
         given()
@@ -90,7 +90,7 @@ class CatResourceTest {
     @TestSecurity(user = "1", roles = "user")
     @JwtSecurity(claims = {
             @Claim(key = "sub", value = "1"),
-            @Claim(key = "email", value = "test@kittigram.org")
+            @Claim(key = "email", value = "test@kitti.es")
     })
     void testDeleteCatNotOwner() {
         given()

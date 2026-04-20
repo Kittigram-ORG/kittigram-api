@@ -31,7 +31,7 @@ class UserResourceTest {
                 .contentType(ContentType.JSON)
                 .body("""
             {
-                "email": "test-%s@kittigram.org",
+                "email": "test-%s@kitti.es",
                 "password": "password123",
                 "name": "Test",
                 "surname": "User"
@@ -50,7 +50,7 @@ class UserResourceTest {
     void testRegisterUserDuplicateEmail() {
         String body = """
             {
-                "email": "duplicate@kittigram.org",
+                "email": "duplicate@kitti.es",
                 "password": "password123",
                 "name": "Test",
                 "surname": "User"
@@ -69,7 +69,7 @@ class UserResourceTest {
     @Test
     void testGetUserUnauthorized() {
         given()
-                .when().get("/users/test@kittigram.org")
+                .when().get("/users/test@kitti.es")
                 .then().statusCode(401);
     }
 }

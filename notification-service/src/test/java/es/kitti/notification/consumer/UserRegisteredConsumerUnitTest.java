@@ -39,7 +39,7 @@ class UserRegisteredConsumerUnitTest {
 
     @Test
     void onUserRegistered_validMessage_sendsEmail() throws Exception {
-        var event = new UserRegisteredEvent(1L, "test@kittigram.org", "Test", "token-123");
+        var event = new UserRegisteredEvent(1L, "test@kitti.es", "Test", "token-123");
         var json = new ObjectMapper().writeValueAsString(event);
 
         when(objectMapper.readValue(json, UserRegisteredEvent.class)).thenReturn(event);
@@ -55,7 +55,7 @@ class UserRegisteredConsumerUnitTest {
 
     @Test
     void onUserRegistered_validMessage_sendsToCorrectRecipient() throws Exception {
-        var event = new UserRegisteredEvent(1L, "test@kittigram.org", "Test", "token-123");
+        var event = new UserRegisteredEvent(1L, "test@kitti.es", "Test", "token-123");
         var json = new ObjectMapper().writeValueAsString(event);
 
         when(objectMapper.readValue(json, UserRegisteredEvent.class)).thenReturn(event);
@@ -68,7 +68,7 @@ class UserRegisteredConsumerUnitTest {
 
         ArgumentCaptor<Mail> captor = ArgumentCaptor.forClass(Mail.class);
         verify(mailer).send(captor.capture());
-        assertEquals("test@kittigram.org", captor.getValue().getTo().get(0));
+        assertEquals("test@kitti.es", captor.getValue().getTo().get(0));
         assertEquals("Activa tu cuenta en Kittigram 🐱", captor.getValue().getSubject());
         assertTrue(captor.getValue().getHtml().contains("token-123"));
     }

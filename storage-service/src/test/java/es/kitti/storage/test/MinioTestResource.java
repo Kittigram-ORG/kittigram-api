@@ -14,8 +14,8 @@ public class MinioTestResource implements QuarkusTestResourceLifecycleManager {
     public Map<String, String> start() {
         minio = new GenericContainer<>(DockerImageName.parse("minio/minio:latest"))
                 .withExposedPorts(9000)
-                .withEnv("MINIO_ROOT_USER", "kittigram")
-                .withEnv("MINIO_ROOT_PASSWORD", "kittigram123")
+                .withEnv("MINIO_ROOT_USER", "kitties")
+                .withEnv("MINIO_ROOT_PASSWORD", "kitties123")
                 .withCommand("server /data");
         minio.start();
 
@@ -25,7 +25,7 @@ public class MinioTestResource implements QuarkusTestResourceLifecycleManager {
         try {
             minio.execInContainer(
                     "sh", "-c",
-                    "mc alias set local http://localhost:9000 kittigram kittigram123 && mc mb local/kittigram"
+                    "mc alias set local http://localhost:9000 kitties kitties123 && mc mb local/kitties"
             );
         } catch (Exception e) {
             throw new RuntimeException("Failed to create test bucket", e);
@@ -33,8 +33,8 @@ public class MinioTestResource implements QuarkusTestResourceLifecycleManager {
 
         return Map.of(
                 "quarkus.s3.endpoint-override", endpoint,
-                "quarkus.s3.aws.credentials.static-provider.access-key-id", "kittigram",
-                "quarkus.s3.aws.credentials.static-provider.secret-access-key", "kittigram123"
+                "quarkus.s3.aws.credentials.static-provider.access-key-id", "kitties",
+                "quarkus.s3.aws.credentials.static-provider.secret-access-key", "kitties123"
         );
     }
 

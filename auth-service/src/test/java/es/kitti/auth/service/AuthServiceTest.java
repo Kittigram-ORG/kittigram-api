@@ -47,7 +47,7 @@ class AuthServiceTest {
         validRefreshToken.id = 1L;
         validRefreshToken.token = UUID.randomUUID().toString();
         validRefreshToken.userId = 1L;
-        validRefreshToken.email = "test@kittigram.org";
+        validRefreshToken.email = "test@kitti.es";
         validRefreshToken.role = "User";
         validRefreshToken.expiresAt = LocalDateTime.now().plusDays(7);
         validRefreshToken.revoked = false;
@@ -55,18 +55,18 @@ class AuthServiceTest {
 
     @Test
     void authenticate_validCredentials_returnsTokens() {
-        var request = new AuthRequest("test@kittigram.org", "password123");
+        var request = new AuthRequest("test@kitti.es", "password123");
 
-        when(userServiceClient.validateCredentials("test@kittigram.org", "password123"))
+        when(userServiceClient.validateCredentials("test@kitti.es", "password123"))
                 .thenReturn(Uni.createFrom().item(
                         ValidateCredentialsResponse.newBuilder()
                                 .setValid(true)
                                 .setUserId(1L)
-                                .setEmail("test@kittigram.org")
+                                .setEmail("test@kitti.es")
                                 .setRole("User")
                                 .build()
                 ));
-        when(jwtTokenService.generateAccessToken(1L, "test@kittigram.org", "User"))
+        when(jwtTokenService.generateAccessToken(1L, "test@kitti.es", "User"))
                 .thenReturn("mocked-access-token");
         when(refreshTokenRepository.persist(any(RefreshToken.class)))
                 .thenReturn(Uni.createFrom().item(validRefreshToken));
@@ -77,14 +77,14 @@ class AuthServiceTest {
         assertNotNull(result);
         assertEquals("mocked-access-token", result.accessToken());
         assertNotNull(result.refreshToken());
-        verify(jwtTokenService).generateAccessToken(1L, "test@kittigram.org", "User");
+        verify(jwtTokenService).generateAccessToken(1L, "test@kitti.es", "User");
     }
 
     @Test
     void authenticate_invalidCredentials_throwsInvalidCredentialsException() {
-        var request = new AuthRequest("wrong@kittigram.org", "wrongpass");
+        var request = new AuthRequest("wrong@kitti.es", "wrongpass");
 
-        when(userServiceClient.validateCredentials("wrong@kittigram.org", "wrongpass"))
+        when(userServiceClient.validateCredentials("wrong@kitti.es", "wrongpass"))
                 .thenReturn(Uni.createFrom().item(
                         ValidateCredentialsResponse.newBuilder()
                                 .setValid(false)
@@ -104,7 +104,7 @@ class AuthServiceTest {
 
         when(refreshTokenRepository.findByToken(validRefreshToken.token))
                 .thenReturn(Uni.createFrom().item(validRefreshToken));
-        when(jwtTokenService.generateAccessToken(1L, "test@kittigram.org", "User"))
+        when(jwtTokenService.generateAccessToken(1L, "test@kitti.es", "User"))
                 .thenReturn("new-access-token");
         when(refreshTokenRepository.persist(any(RefreshToken.class)))
                 .thenReturn(Uni.createFrom().item(validRefreshToken));

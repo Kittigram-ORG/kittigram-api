@@ -21,16 +21,16 @@ class AuthResourceTest {
 
     @BeforeEach
     void setUp() {
-        Mockito.when(userServiceClient.validateCredentials("test@kittigram.org", "password123"))
+        Mockito.when(userServiceClient.validateCredentials("test@kitti.es", "password123"))
                 .thenReturn(Uni.createFrom().item(
                         ValidateCredentialsResponse.newBuilder()
                                 .setValid(true)
                                 .setUserId(1L)
-                                .setEmail("test@kittigram.org")
+                                .setEmail("test@kitti.es")
                                 .build()
                 ));
 
-        Mockito.when(userServiceClient.validateCredentials("wrong@kittigram.org", "wrongpass"))
+        Mockito.when(userServiceClient.validateCredentials("wrong@kitti.es", "wrongpass"))
                 .thenReturn(Uni.createFrom().item(
                         ValidateCredentialsResponse.newBuilder()
                                 .setValid(false)
@@ -44,7 +44,7 @@ class AuthResourceTest {
                 .contentType(ContentType.JSON)
                 .body("""
                 {
-                    "email": "test@kittigram.org",
+                    "email": "test@kitti.es",
                     "password": "password123"
                 }
                 """)
@@ -62,7 +62,7 @@ class AuthResourceTest {
                 .contentType(ContentType.JSON)
                 .body("""
                 {
-                    "email": "wrong@kittigram.org",
+                    "email": "wrong@kitti.es",
                     "password": "wrongpass"
                 }
                 """)

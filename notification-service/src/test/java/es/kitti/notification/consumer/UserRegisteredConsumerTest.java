@@ -40,7 +40,7 @@ class UserRegisteredConsumerTest {
 
         String payload = objectMapper.writeValueAsString(new UserRegisteredEvent(
                 1L,
-                "test@kittigram.org",
+                "test@kitti.es",
                 "Test",
                 "test-activation-token"
         ));
@@ -48,8 +48,8 @@ class UserRegisteredConsumerTest {
         source.send(payload);
 
         await().atMost(5, TimeUnit.SECONDS).untilAsserted(() -> {
-            assertFalse(mailbox.getMailsSentTo("test@kittigram.org").isEmpty());
-            var mail = mailbox.getMailsSentTo("test@kittigram.org").get(0);
+            assertFalse(mailbox.getMailsSentTo("test@kitti.es").isEmpty());
+            var mail = mailbox.getMailsSentTo("test@kitti.es").get(0);
             assertEquals("Activa tu cuenta en Kittigram 🐱", mail.getSubject());
             assertTrue(mail.getHtml().contains("test-activation-token"));
         });
@@ -61,7 +61,7 @@ class UserRegisteredConsumerTest {
 
         String payload = objectMapper.writeValueAsString(new UserRegisteredEvent(
                 2L,
-                "link-test@kittigram.org",
+                "link-test@kitti.es",
                 "LinkTest",
                 "my-unique-token-123"
         ));
@@ -69,8 +69,8 @@ class UserRegisteredConsumerTest {
         source.send(payload);
 
         await().atMost(5, TimeUnit.SECONDS).untilAsserted(() -> {
-            assertFalse(mailbox.getMailsSentTo("link-test@kittigram.org").isEmpty());
-            var mail = mailbox.getMailsSentTo("link-test@kittigram.org").get(0);
+            assertFalse(mailbox.getMailsSentTo("link-test@kitti.es").isEmpty());
+            var mail = mailbox.getMailsSentTo("link-test@kitti.es").get(0);
             assertTrue(mail.getHtml().contains("activate?token=my-unique-token-123"));
         });
     }

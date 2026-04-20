@@ -14,7 +14,7 @@ import es.kitti.user.grpc.ValidateCredentialsResponse;
 public class MockUserServiceClient {
 
     public Uni<ValidateCredentialsResponse> validateCredentials(String email, String password) {
-        if ("test@kittigram.org".equals(email) && "password123".equals(password)) {
+        if ("test@kitti.es".equals(email) && "password123".equals(password)) {
             return Uni.createFrom().item(
                     ValidateCredentialsResponse.newBuilder()
                             .setValid(true)
