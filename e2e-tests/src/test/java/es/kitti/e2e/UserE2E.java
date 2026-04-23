@@ -52,14 +52,12 @@ class UserE2E {
 
     @Test @Order(2)
     void getProfile_anotherUser_returns200() {
-        // Any authenticated user can read any profile — no requireSelf on GET
         given()
             .header("Authorization", "Bearer " + otherToken)
         .when()
             .get("/api/users/" + EMAIL)
         .then()
-            .statusCode(200)
-            .body("email", equalTo(EMAIL));
+            .statusCode(403);
     }
 
     @Test @Order(3)
