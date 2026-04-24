@@ -330,20 +330,21 @@ Unit tests use plain Mockito (`@ExtendWith(MockitoExtension.class)`), no contain
 | user-service          | 8    | 3           | SmallRye in-memory Kafka                             |
 | auth-service          | 7    | 4           | `@InjectMock` on gRPC client                         |
 | cat-service           | 9    | 5           | JWT test tokens via `quarkus-smallrye-jwt-build`     |
-| storage-service       | 6    | 2           | Real MinIO via `QuarkusTestResourceLifecycleManager` |
-| gateway-service       | 2    | 22          | WireMock 1.6.1 DevService; Mockito para unit tests   |
+| storage-service       | 9    | 3           | Real MinIO via `QuarkusTestResourceLifecycleManager` |
+| gateway-service       | 2    | 23          | WireMock 1.6.1 DevService; Mockito para unit tests   |
 | notification-service  | 3    | 2           | MockMailbox + in-memory Kafka + Awaitility           |
 | adoption-service      | 17   | 9           | RBAC + ownership checks covered                      |
 | form-analysis-service | 8    | 3           | Rules engine + in-memory Kafka                       |
 | organization-service  | 14   | 11          | Plan-based member limits; @TestSecurity RBAC         |
 
-**Total: 138 tests** (74 unit + 64 integration)
+**Total: 143 tests** (77 unit + 66 integration)
 
 **End-to-end tests** run against the full live stack (all services + Docker infra):
 
 | Suite              | Tests | Coverage |
 |--------------------|-------|----------|
 | `StorageE2E`       | 6     | Upload JPEG, serve public, 401, 400 invalid type, delete, rate limit 429 |
+| `SecurityE2E`      | 2     | Magic byte upload rejection (400), X-Content-Type-Options nosniff on gateway responses |
 
 ```bash
 # Run e2e suite (requires full stack running)
@@ -463,14 +464,14 @@ Copy `.env.example` to `.env` and fill in all values. Variables marked **require
 ### Priority 1 — Foundation (prerequisite for everything)
 
 - [x] All services implemented with full adoption workflow
-- [x] Integration and unit tests for all services (113 total)
+- [x] Integration and unit tests for all services (143 total)
 - [x] Value Objects (`Email`, `ActivationToken`)
 - [x] User roles (`User`, `Organization`, `Admin`)
 - [x] Security audit completed (11 vulnerabilities found and fixed, score 5.5 → 8.5/10)
 - [x] JaCoCo configured across all modules (quarkus-jacoco + maven plugin in root pom)
 - [x] gateway-service instruction coverage at 100% (574/574); branch coverage 93.5% (4 unreachable branches in Vert.x WebClient code)
 - [ ] **CI/CD with GitHub Actions** — no pipeline exists; tests only run locally. Minimum: compile + test on push, JaCoCo report as PR artifact, OWASP Dependency Check + Trivy.
-- [ ] **Flyway** — versioned SQL migrations per service, `migrate-at-start=true`, Hibernate in `validate` mode in production. Pattern to be defined in `user-service` first.
+- [x] **Flyway** — versioned SQL migrations per service, `migrate-at-start=true`, Hibernate in `validate` mode in production. All 6 database-backed services have V1 migrations (auth, user, cat, adoption, organization, form-analysis).
 - [ ] **Production Docker Compose** — prerequisite for any real deployment.
 - [ ] **Observability** — OpenTelemetry distributed traces, metrics, and centralized logs. No correlation IDs between services today; debugging a gateway → auth → adoption flow requires grepping logs manually.
 - [ ] **Coverage baselines for remaining modules** — JaCoCo is installed; run `mvn test -pl <module>` and review `target/site/jacoco/index.html` per service.
@@ -518,6 +519,8 @@ These features make the portal self-sustaining without depending solely on shelt
 - [x] Activation token moved from query param to POST body
 - [x] Credentials removed from docker-compose (`.env` + `.env.example`)
 - [x] JWT keys externalized in `%prod` profile (mounted secrets, not classpath)
+- [x] MIME magic byte validation on upload — rejects files whose bytes don't match declared Content-Type (JPEG/PNG spoofing prevention)
+- [x] `X-Content-Type-Options: nosniff` injected on all gateway responses (MIME sniffing prevention)
 - [ ] **Fix `IpRateLimiter` cross-endpoint bucket sharing** — refresh and upload (IP key) share the same `Deque<Long>`; two uploads consume from the same window as two refreshes for the same IP.
 - [ ] Rate limiting distributed with Redis — current limit is per JVM instance; multi-replica deployments multiply the effective limit.
 - [ ] Activation token expiry (`activationTokenExpiresAt`)
