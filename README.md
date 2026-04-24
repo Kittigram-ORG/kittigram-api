@@ -352,14 +352,30 @@ cp .env.example .env
 
 See [Environment Variables](#environment-variables) for a full reference.
 
-### 3. Start the production stack
+### 3. Bootstrap SSL (first deploy only)
+
+Nginx requires the certificate to exist before it can start the HTTPS server block.
+Run Certbot in standalone mode once before bringing up the full stack:
+
+```bash
+docker compose -f docker-compose.prod.yml up -d postgres minio zookeeper kafka
+docker run --rm -p 80:80 \
+  -v kitties-prod_certbot_certs:/etc/letsencrypt \
+  -v kitties-prod_certbot_www:/var/www/certbot \
+  certbot/certbot certonly --standalone \
+  -d www.kitti.es --email ciscoadiz@gmail.com --agree-tos --no-eff-email
+```
+
+Subsequent renewals are handled automatically by the `certbot` service (every 12 h).
+
+### 4. Start the production stack
 
 ```bash
 docker compose -f docker-compose.prod.yml up -d
 ```
 
-This starts PostgreSQL 16, MinIO, Zookeeper, Kafka, and all 9 application services.
-The gateway is exposed on **port 8080**; all other services are internal-only on `kitties-net`.
+This starts PostgreSQL 16, MinIO, Zookeeper, Kafka, all 9 application services, Nginx (ports 80/443), and the Certbot renewal daemon.
+Traffic enters via Nginx on **port 443** (HTTPS); HTTP redirects to HTTPS automatically.
 
 ### CI/CD Pipeline
 
