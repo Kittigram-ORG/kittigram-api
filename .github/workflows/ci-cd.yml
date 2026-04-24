@@ -1,0 +1,71 @@
+name: CI / CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Test (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - user-service
+          - auth-service
+          - cat-service
+          - storage-service
+          - notification-service
+          - adoption-service
+          - form-analysis-service
+          - organization-service
+          - gateway-service
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Run tests
+        run: mvn test -pl ${{ matrix.service }} -B --no-transfer-progress
+
+  deploy:
+    name: Push (${{ matrix.service }})
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: test
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - gateway-service
+          - user-service
+          - auth-service
+          - storage-service
+          - cat-service
+          - notification-service
+          - adoption-service
+          - form-analysis-service
+          - organization-service
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Build and push image
+        run: |
+          mvn package -pl ${{ matrix.service }} -DskipTests -B --no-transfer-progress \
+            -Dquarkus.container-image.build=true \
+            -Dquarkus.container-image.push=true \
+            -Dquarkus.container-image.username=${{ secrets.DOCKERHUB_USERNAME }} \
+            -Dquarkus.container-image.password=${{ secrets.DOCKERHUB_TOKEN }}
