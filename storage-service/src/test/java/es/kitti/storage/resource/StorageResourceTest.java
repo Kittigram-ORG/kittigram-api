@@ -66,4 +66,29 @@ class StorageResourceTest {
                 .then()
                 .statusCode(400);
     }
+
+    @Test
+    void testUploadWebpImage() throws IOException {
+        File tempFile = File.createTempFile("test", ".webp");
+        try (FileOutputStream fos = new FileOutputStream(tempFile)) {
+            // RIFF header
+            fos.write(new byte[]{0x52, 0x49, 0x46, 0x46});
+            // file size (little-endian)
+            fos.write(new byte[]{0x04, 0x00, 0x00, 0x00});
+            // WEBP marker
+            fos.write(new byte[]{0x57, 0x45, 0x42, 0x50});
+            // padding
+            fos.write(new byte[88]);
+        }
+        tempFile.deleteOnExit();
+
+        given()
+                .multiPart("file", tempFile, "image/webp")
+                .when()
+                .post("/storage/upload")
+                .then()
+                .statusCode(200)
+                .body("key", notNullValue())
+                .body("url", notNullValue());
+    }
 }

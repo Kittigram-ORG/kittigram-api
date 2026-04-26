@@ -20,6 +20,7 @@ class StorageServiceTest {
 
     private static final byte[] JPEG_DATA = jpegData(100);
     private static final byte[] PNG_DATA  = pngData(100);
+    private static final byte[] WEBP_DATA = webpData(100);
 
     @Mock
     StorageProvider storageProvider;
@@ -125,6 +126,43 @@ class StorageServiceTest {
     }
 
     @Test
+    void upload_validWebp_returnsKey() {
+        when(storageProvider.upload(anyString(), eq(WEBP_DATA), eq("image/webp")))
+                .thenReturn(Uni.createFrom().item("some-key.webp"));
+
+        var result = storageService.upload(WEBP_DATA, "image/webp", "photo.webp")
+                .await().indefinitely();
+
+        assertNotNull(result);
+        assertTrue(result.endsWith(".webp"));
+        verify(storageProvider).upload(anyString(), eq(WEBP_DATA), eq("image/webp"));
+    }
+
+    @Test
+    void upload_webpWrongMagicBytes_throwsInvalidFileException() {
+        byte[] riffButNoWebp = {0x52, 0x49, 0x46, 0x46, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+
+        assertThrows(InvalidFileException.class, () ->
+                storageService.upload(riffButNoWebp, "image/webp", "photo.webp")
+                        .await().indefinitely()
+        );
+
+        verify(storageProvider, never()).upload(any(), any(), any());
+    }
+
+    @Test
+    void upload_webpTooShort_throwsInvalidFileException() {
+        byte[] tooShort = {0x52, 0x49, 0x46, 0x46, 0x04, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42}; // 11 bytes
+
+        assertThrows(InvalidFileException.class, () ->
+                storageService.upload(tooShort, "image/webp", "photo.webp")
+                        .await().indefinitely()
+        );
+
+        verify(storageProvider, never()).upload(any(), any(), any());
+    }
+
+    @Test
     void delete_delegatesToProvider() {
         when(storageProvider.delete("some-key.jpg"))
                 .thenReturn(Uni.createFrom().voidItem());
@@ -151,6 +189,23 @@ class StorageServiceTest {
         byte[] magic = {(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
         byte[] data = new byte[size];
         System.arraycopy(magic, 0, data, 0, magic.length);
+        return data;
+    }
+
+    private static byte[] webpData(int size) {
+        byte[] data = new byte[size];
+        data[0] = 0x52; // R
+        data[1] = 0x49; // I
+        data[2] = 0x46; // F
+        data[3] = 0x46; // F
+        data[4] = 0x04; // file size
+        data[5] = 0x00;
+        data[6] = 0x00;
+        data[7] = 0x00;
+        data[8] = 0x57; // W
+        data[9] = 0x45; // E
+        data[10] = 0x42; // B
+        data[11] = 0x50; // P
         return data;
     }
 }

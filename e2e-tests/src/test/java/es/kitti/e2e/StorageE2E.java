@@ -26,6 +26,13 @@ class StorageE2E {
             (byte) 0xFF, (byte) 0xD9
     };
 
+    // Minimal valid WebP (RIFF + WEBP marker)
+    private static final byte[] TINY_WEBP = new byte[]{
+            0x52, 0x49, 0x46, 0x46,  // RIFF
+            0x04, 0x00, 0x00, 0x00,  // file size
+            0x57, 0x45, 0x42, 0x50   // WEBP
+    };
+
     // Unique per-run IP prevents the rate-limit bucket filled by the last test
     // from bleeding into the next test run within the 60-second window.
     private static final String TEST_IP = "test-" + TS;
@@ -134,5 +141,22 @@ class StorageE2E {
         }
         Assertions.assertEquals(429, lastStatus,
             "Expected 429 Too Many Requests on the 6th upload attempt");
+    }
+
+    @Test @Order(7)
+    void upload_validWebp_returns200WithKeyAndUrl() {
+        var response = given()
+            .header("Authorization", "Bearer " + token)
+            .header("X-Forwarded-For", TEST_IP)
+            .multiPart("file", "test.webp", TINY_WEBP, "image/webp")
+        .when()
+            .post("/api/storage/upload")
+        .then()
+            .statusCode(200)
+            .body("key", notNullValue())
+            .body("url", notNullValue())
+            .extract().response();
+
+        assertNotNull(response.jsonPath().getString("key"));
     }
 }
