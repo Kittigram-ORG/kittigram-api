@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import es.kitti.chat.dto.BlockUserRequest;
 import es.kitti.chat.dto.ConversationResponse;
 import es.kitti.chat.dto.MessageResponse;
 import es.kitti.chat.dto.SendMessageRequest;
@@ -57,6 +58,23 @@ public class ChatResource {
                                      @Valid SendMessageRequest request) {
         return service.sendMessage(id, request, callerId(), callerType())
                 .onItem().transform(m -> Response.status(Response.Status.CREATED).entity(m).build());
+    }
+
+    @POST
+    @Path("/{id}/block")
+    @RolesAllowed("Organization")
+    public Uni<Response> blockUser(@PathParam("id") Long id,
+                                   @Valid BlockUserRequest request) {
+        return service.blockUser(id, callerId(), request)
+                .onItem().transform(v -> Response.noContent().build());
+    }
+
+    @DELETE
+    @Path("/{id}/block")
+    @RolesAllowed("Organization")
+    public Uni<Response> unblockUser(@PathParam("id") Long id) {
+        return service.unblockUser(id, callerId())
+                .onItem().transform(v -> Response.noContent().build());
     }
 
     private Long callerId() {

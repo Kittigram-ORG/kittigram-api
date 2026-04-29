@@ -23,6 +23,11 @@ public class GlobalExceptionMapper implements ExceptionMapper<Throwable> {
                     .entity(new ErrorResponse(409, exception.getMessage()))
                     .build();
         }
+        if (exception instanceof UserBlockedException) {
+            return Response.status(Response.Status.FORBIDDEN)
+                    .entity(new ErrorResponse(403, exception.getMessage()))
+                    .build();
+        }
         if (exception instanceof ForbiddenException) {
             return Response.status(Response.Status.FORBIDDEN)
                     .entity(new ErrorResponse(403, "Access denied"))

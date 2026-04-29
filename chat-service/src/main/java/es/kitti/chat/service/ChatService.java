@@ -6,16 +6,20 @@ import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.ForbiddenException;
+import es.kitti.chat.dto.BlockUserRequest;
 import es.kitti.chat.dto.ConversationResponse;
 import es.kitti.chat.dto.CreateConversationRequest;
 import es.kitti.chat.dto.MessageResponse;
 import es.kitti.chat.dto.SendMessageRequest;
+import es.kitti.chat.entity.BlockedParticipant;
 import es.kitti.chat.entity.Conversation;
 import es.kitti.chat.entity.Message;
 import es.kitti.chat.entity.SenderType;
 import es.kitti.chat.exception.ConversationAlreadyExistsException;
 import es.kitti.chat.exception.ConversationNotFoundException;
+import es.kitti.chat.exception.UserBlockedException;
 import es.kitti.chat.mapper.ChatMapper;
+import es.kitti.chat.repository.BlockedParticipantRepository;
 import es.kitti.chat.repository.ConversationRepository;
 import es.kitti.chat.repository.MessageRepository;
 
@@ -30,6 +34,9 @@ public class ChatService {
 
     @Inject
     MessageRepository messageRepository;
+
+    @Inject
+    BlockedParticipantRepository blockedRepository;
 
     @Inject
     ChatMapper mapper;
@@ -75,19 +82,60 @@ public class ChatService {
     public Uni<MessageResponse> sendMessage(Long conversationId, SendMessageRequest request,
                                             Long callerId, SenderType callerType) {
         return loadAndAuthorize(conversationId, callerId, callerType)
-                .onItem().transformToUni(c -> {
-                    Message m = new Message();
-                    m.conversationId = c.id;
-                    m.senderId = callerId;
-                    m.senderType = callerType;
-                    m.content = request.content();
-                    return messageRepository.<Message>persist(m)
-                            .onItem().call(saved -> {
-                                c.lastMessageAt = LocalDateTime.now();
-                                return conversationRepository.persist(c);
-                            });
-                })
+                .onItem().transformToUni(c -> rejectIfUserBlocked(c, callerId, callerType)
+                        .onItem().transformToUni(ignored -> {
+                            Message m = new Message();
+                            m.conversationId = c.id;
+                            m.senderId = callerId;
+                            m.senderType = callerType;
+                            m.content = request.content();
+                            return messageRepository.<Message>persist(m)
+                                    .onItem().call(saved -> {
+                                        c.lastMessageAt = LocalDateTime.now();
+                                        return conversationRepository.persist(c);
+                                    });
+                        }))
                 .onItem().transform(mapper::toResponse);
+    }
+
+    @WithTransaction
+    public Uni<Void> blockUser(Long conversationId, Long callerOrgId, BlockUserRequest request) {
+        return loadAndAuthorize(conversationId, callerOrgId, SenderType.Organization)
+                .onItem().transformToUni(c -> blockedRepository.findByOrgAndUser(c.organizationId, c.userId)
+                        .onItem().transformToUni(existing -> {
+                            if (existing != null) {
+                                if (request != null && request.reason() != null) {
+                                    existing.reason = request.reason();
+                                    return blockedRepository.<BlockedParticipant>persist(existing)
+                                            .replaceWithVoid();
+                                }
+                                return Uni.createFrom().voidItem();
+                            }
+                            BlockedParticipant b = new BlockedParticipant();
+                            b.organizationId = c.organizationId;
+                            b.userId = c.userId;
+                            b.reason = request != null ? request.reason() : null;
+                            return blockedRepository.persist(b).replaceWithVoid();
+                        }));
+    }
+
+    @WithTransaction
+    public Uni<Void> unblockUser(Long conversationId, Long callerOrgId) {
+        return loadAndAuthorize(conversationId, callerOrgId, SenderType.Organization)
+                .onItem().transformToUni(c -> blockedRepository.findByOrgAndUser(c.organizationId, c.userId)
+                        .onItem().transformToUni(existing -> {
+                            if (existing == null) return Uni.createFrom().voidItem();
+                            return blockedRepository.delete(existing);
+                        }));
+    }
+
+    private Uni<Void> rejectIfUserBlocked(Conversation c, Long callerId, SenderType callerType) {
+        if (callerType != SenderType.User) return Uni.createFrom().voidItem();
+        return blockedRepository.existsByOrgAndUser(c.organizationId, callerId)
+                .onItem().invoke(blocked -> {
+                    if (blocked) throw new UserBlockedException();
+                })
+                .replaceWithVoid();
     }
 
     private Uni<Conversation> loadAndAuthorize(Long conversationId, Long callerId, SenderType callerType) {

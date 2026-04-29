@@ -104,4 +104,52 @@ class ChatResourceTest {
                 .then()
                 .statusCode(404);
     }
+
+    @Test
+    void block_unauthorized_returns401() {
+        given()
+                .contentType(ContentType.JSON)
+                .body("{}")
+                .when()
+                .post("/chats/1/block")
+                .then()
+                .statusCode(401);
+    }
+
+    @Test
+    @TestSecurity(user = "100", roles = "User")
+    @JwtSecurity(claims = {@Claim(key = "sub", value = "100")})
+    void block_asUser_returns403() {
+        given()
+                .contentType(ContentType.JSON)
+                .body("{}")
+                .when()
+                .post("/chats/1/block")
+                .then()
+                .statusCode(403);
+    }
+
+    @Test
+    @TestSecurity(user = "200", roles = "Organization")
+    @JwtSecurity(claims = {@Claim(key = "sub", value = "200")})
+    void block_unknownConversation_returns404() {
+        given()
+                .contentType(ContentType.JSON)
+                .body("{\"reason\":\"abuse\"}")
+                .when()
+                .post("/chats/999999/block")
+                .then()
+                .statusCode(404);
+    }
+
+    @Test
+    @TestSecurity(user = "200", roles = "Organization")
+    @JwtSecurity(claims = {@Claim(key = "sub", value = "200")})
+    void unblock_unknownConversation_returns404() {
+        given()
+                .when()
+                .delete("/chats/999999/block")
+                .then()
+                .statusCode(404);
+    }
 }
