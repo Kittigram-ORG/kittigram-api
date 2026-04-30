@@ -1,5 +1,6 @@
 package es.kitti.cat.service;
 
+import io.quarkus.hibernate.reactive.panache.Panache;
 import io.quarkus.hibernate.reactive.panache.common.WithSession;
 import io.quarkus.hibernate.reactive.panache.common.WithTransaction;
 import io.smallrye.mutiny.Multi;
@@ -164,23 +165,31 @@ public class CatService {
                 });
     }
 
-    @WithTransaction
     public Uni<Void> deleteCat(Long id, Long organizationId) {
-        return catRepository.findById(id)
-                .onItem().ifNull()
-                .failWith(() -> new CatNotFoundException(id))
-                .onItem().transformToUni(cat -> {
-                    requireOwner(cat, organizationId);
-                    return adoptionClient.hasActiveRequestsForCat(id, internalSecret)
-                            .onItem().transformToUni(hasActive -> {
-                                if (hasActive) {
-                                    return Uni.createFrom().<Void>failure(
-                                            new CatHasActiveAdoptionsException(id));
-                                }
+        // Step 1: verify existence and ownership (session, no transaction)
+        return Panache.withSession(() ->
+                catRepository.findById(id)
+                        .onItem().ifNull().failWith(() -> new CatNotFoundException(id))
+                        .onItem().invoke(cat -> requireOwner(cat, organizationId))
+                        .replaceWithVoid()
+        )
+        // Step 2: check adoption-service (outside any DB session)
+        .onItem().transformToUni(__ ->
+                adoptionClient.hasActiveRequestsForCat(id, internalSecret)
+        )
+        // Step 3: logical delete in its own transaction
+        .onItem().transformToUni(hasActive -> {
+            if (hasActive) {
+                return Uni.createFrom().failure(new CatHasActiveAdoptionsException(id));
+            }
+            return Panache.withTransaction(() ->
+                    catRepository.findById(id)
+                            .onItem().transformToUni(cat -> {
                                 cat.status = CatStatus.Deleted;
                                 return catRepository.persist(cat).replaceWithVoid();
-                            });
-                });
+                            })
+            );
+        });
     }
 
     private void requireOwner(Cat cat, Long organizationId) {
