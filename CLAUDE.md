@@ -11,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Servicios y puertos
 
-Los 9 servicios son todos activos e intencionales. No eliminar ninguno de esta tabla; los puertos están verificados contra `application.properties` de cada módulo.
+Los 10 servicios son todos activos e intencionales. No eliminar ninguno de esta tabla; los puertos están verificados contra `application.properties` de cada módulo.
 
 | Servicio             | HTTP | gRPC        | Rutas públicas (sin JWT)                        |
 |----------------------|------|-------------|-------------------------------------------------|
@@ -24,6 +24,7 @@ Los 9 servicios son todos activos e intencionales. No eliminar ninguno de esta t
 | adoption-service     | 8086 | —           | —                                               |
 | form-analysis-service| 8087 | —           | —                                               |
 | organization-service | 8088 | —           | —                                               |
+| chat-service         | 8089 | —           | —                                               |
 
 ## Arquitectura — reglas duras
 - Sin dependencias Maven entre módulos. Comunicación solo vía gRPC o Kafka.
@@ -120,6 +121,7 @@ public enum AdoptionStatus { Pending, Reviewing, Accepted, Rejected, Completed }
 - Borrado de usuarios: lógico (status → Inactive), nunca físico.
 - `ProxyService` explota con NPE si la respuesta upstream no tiene body (ej. 204). Siempre guardar `r.body() != null`.
 - `JwtAuthFilter` tiene una lista explícita de rutas públicas (`PUBLIC_EXACT`). Añadir ahí cualquier endpoint nuevo que no requiera Bearer token.
+- **Auth servicio-a-servicio (interno)**: usar el secreto compartido `kitties.internal.secret` (mismo valor en todos los servicios; en dev `kitties-dev-secret`, en prod via env `KITTIES_INTERNAL_SECRET`). Para gRPC: metadata `x-internal-token` validada por interceptors (`GrpcAuthInterceptor` en el server, `GrpcClientAuthInterceptor` en el client). Para HTTP: header `X-Internal-Token` validado por un `ContainerRequestFilter` con la annotation `@InternalOnly` (referencia: `cat-service/security/InternalTokenFilter.java`). Nunca exponer endpoints `@InternalOnly` por el gateway.
 - El rate limiter (`IpRateLimiter`) usa email como clave para login y IP para el resto. No cambiar a global o los tests se contaminarán entre sí.
 - **Tests e2e + rate limiter**: enviar siempre `X-Forwarded-For: TEST_IP` (único por ejecución, ej. `"test-" + System.currentTimeMillis()`) en los requests que consuman del mismo bucket de rate limit. Sin esto los tests se contaminan entre ejecuciones dentro de la ventana de 60 s.
 - **`minio/minio:latest` NO crea buckets automáticamente** con `MINIO_DEFAULT_BUCKETS` (eso es una feature de `bitnami/minio`). Usar un `BucketInitializer` (`@Observes StartupEvent`) que haga `headBucket` → `createBucket` con `S3AsyncClient.get()` (bloqueante en startup está bien).

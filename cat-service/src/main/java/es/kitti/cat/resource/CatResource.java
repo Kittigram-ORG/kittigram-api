@@ -4,6 +4,7 @@ import io.quarkus.security.Authenticated;
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import jakarta.annotation.security.PermitAll;
+import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.validation.Valid;
 import jakarta.ws.rs.*;
@@ -20,7 +21,6 @@ import org.jboss.resteasy.reactive.multipart.FileUpload;
 
 @Path("/cats")
 @Produces(MediaType.APPLICATION_JSON)
-@Consumes(MediaType.APPLICATION_JSON)
 @Authenticated
 public class CatResource {
 
@@ -47,6 +47,8 @@ public class CatResource {
     }
 
     @POST
+    @RolesAllowed("Organization")
+    @Consumes(MediaType.APPLICATION_JSON)
     public Uni<Response> createCat(@Valid CatCreateRequest request) {
         Long callerId = Long.parseLong(jwt.getSubject());
         return catService.createCat(request, callerId)
@@ -56,6 +58,8 @@ public class CatResource {
 
     @PUT
     @Path("/{id}")
+    @RolesAllowed("Organization")
+    @Consumes(MediaType.APPLICATION_JSON)
     public Uni<Response> updateCat(
             @PathParam("id") Long id,
             @Valid CatUpdateRequest request) {
@@ -66,6 +70,7 @@ public class CatResource {
 
     @DELETE
     @Path("/{id}")
+    @RolesAllowed("Organization")
     public Uni<Response> deleteCat(@PathParam("id") Long id) {
         Long callerId = Long.parseLong(jwt.getSubject());
         return catService.deleteCat(id, callerId)
@@ -74,6 +79,7 @@ public class CatResource {
 
     @POST
     @Path("/{id}/images")
+    @RolesAllowed("Organization")
     @Consumes(MediaType.MULTIPART_FORM_DATA)
     public Uni<Response> uploadImage(
             @PathParam("id") Long id,
@@ -85,6 +91,7 @@ public class CatResource {
 
     @DELETE
     @Path("/{catId}/images/{imageId}")
+    @RolesAllowed("Organization")
     public Uni<Response> deleteImage(
             @PathParam("catId") Long catId,
             @PathParam("imageId") Long imageId) {
