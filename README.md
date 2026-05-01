@@ -595,9 +595,9 @@ Copy `.env.example` to `.env` and fill in all values. Variables marked **require
 - [x] gateway-service instruction coverage at 100% (574/574); branch coverage 93.5% (4 unreachable branches in Vert.x WebClient code)
 - [x] **CI/CD with GitHub Actions** — test matrix across all 9 services on every push; Docker Hub image push on merge to `main`.
 - [x] **Flyway** — versioned SQL migrations per service, `migrate-at-start=true`, Hibernate in `validate` mode in production. All 6 database-backed services have V1 migrations (auth, user, cat, adoption, organization, form-analysis).
-- [ ] **Production Docker Compose** — prerequisite for any real deployment.
-- [ ] **Observability** — OpenTelemetry distributed traces, metrics, and centralized logs. No correlation IDs between services today; debugging a gateway → auth → adoption flow requires grepping logs manually.
-- [ ] **Coverage baselines for remaining modules** — JaCoCo is installed; run `mvn test -pl <module>` and review `target/site/jacoco/index.html` per service.
+- [x] **Production Docker Compose** — all 10 services + Nginx (TLS termination, HTTP→HTTPS redirect) + Certbot auto-renewal. CI/CD pushes images to Docker Hub; `docker compose -f docker-compose.prod.yml up -d` is the full deploy.
+- [x] **Observability** — OpenTelemetry traces + Micrometer metrics in every service (`quarkus-opentelemetry` + `quarkus-micrometer`). Grafana Alloy collects and forwards to Grafana Cloud (OTLP). SDK disabled in `%dev` and `%test` profiles; active only in prod.
+- [x] **Coverage baselines for remaining modules** — JaCoCo configured across all modules via root pom (`quarkus-jacoco` + `jacoco-maven-plugin`); reports available at `target/site/jacoco/index.html` per service after `mvn test`.
 
 ### Priority 2 — Shelter Dashboard (core revenue)
 
