@@ -22,6 +22,7 @@ Microservices backend for Kitties, a cat adoption platform for shelters and vete
 - [Known Patterns](#known-patterns)
 - [Environment Variables](#environment-variables)
 - [Roadmap](#roadmap)
+- [Privacy & Data Protection](PRIVACY.md)
 
 ---
 
@@ -670,6 +671,12 @@ These features make the portal self-sustaining without depending solely on shelt
 - [ ] **User / org deactivation events** — `UserService.deactivateUser` only sets `status = Inactive`; no Kafka event is emitted. Active adoption requests are left orphaned when an adopter or organization is deactivated. Agreed pattern: `user-service` emits `user-deactivated`, `organization-service` emits `organization-deactivated`; `adoption-service` (and others) subscribe and cancel related active entities. (`feat/user-deactivated-event`, `feat/org-deactivated-event`)
 - [ ] **Intake living inside adoption-service** — `IntakeRequest` was placed in `adoption-service` under `intake/` as a v1 shortcut (shared DB, shared config). It models a different responsibility (surrendering a cat to a shelter vs. adopting one). Extract to `intake-service` if the domain grows significantly. Keep `intake/` and `adoption/` packages strictly separate in the meantime.
 - [ ] **OrganizationMember extraction** — `OrganizationService` and `OrganizationMemberService` are already split into separate beans. Full extraction to a dedicated microservice requires converting `Organization.create()` into a Kafka saga and removing the cross-bean repo read in `inviteMember`. Deferred until the coupling actually hurts.
+
+---
+
+## Privacy & Data Protection
+
+See [PRIVACY.md](PRIVACY.md) for the full RGPD / LOPDGDD compliance audit: data inventory, identified gaps (DNI en texto plano, datos de salud sin consentimiento explícito, derecho al olvido, retención), y plan de acción priorizado.
 
 ---
 
