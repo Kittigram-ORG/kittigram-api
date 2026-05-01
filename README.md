@@ -662,6 +662,10 @@ These features make the portal self-sustaining without depending solely on shelt
 - [ ] Value Objects for remaining services.
 - [ ] Repository interfaces as ports (DIP) across all services.
 - [ ] Pagination on cat listing.
+- [ ] **`findAlternatives` includes the rejecting org** — `IntakeRequestService.findAlternatives` filters by `o.id() == excludeOrgId`, but `o.id()` is the `Organization` entity id while `excludeOrgId` is the JWT sub of the org user (two independent sequences). The rejecting org reappears in `alternatives` when the sequences happen to collide. The e2e assert is relaxed pending a fix. Root cause: `organizationId` is not consistently entity-id vs user-sub across `Cat`, `AdoptionRequest`, and `IntakeRequest`. Fix requires aligning the ID convention system-wide before patching the filter. (`feat/fix-intake-alternatives-exclude`)
+- [ ] **User / org deactivation events** — `UserService.deactivateUser` only sets `status = Inactive`; no Kafka event is emitted. Active adoption requests are left orphaned when an adopter or organization is deactivated. Agreed pattern: `user-service` emits `user-deactivated`, `organization-service` emits `organization-deactivated`; `adoption-service` (and others) subscribe and cancel related active entities. (`feat/user-deactivated-event`, `feat/org-deactivated-event`)
+- [ ] **Intake living inside adoption-service** — `IntakeRequest` was placed in `adoption-service` under `intake/` as a v1 shortcut (shared DB, shared config). It models a different responsibility (surrendering a cat to a shelter vs. adopting one). Extract to `intake-service` if the domain grows significantly. Keep `intake/` and `adoption/` packages strictly separate in the meantime.
+- [ ] **OrganizationMember extraction** — `OrganizationService` and `OrganizationMemberService` are already split into separate beans. Full extraction to a dedicated microservice requires converting `Organization.create()` into a Kafka saga and removing the cross-bean repo read in `inviteMember`. Deferred until the coupling actually hurts.
 
 ---
 
