@@ -97,12 +97,15 @@ Issues and rotates JWT tokens. Validates credentials via gRPC against `user-serv
 
 Cat profiles for adoption. Images are proxied through the gateway; bucket URLs are never exposed directly.
 
+**Cat lifecycle:** `Available` → `Unavailable` / `Deleted` (logical only — no row is ever removed)
+
 **Endpoints:**
-- `GET /cats?city=X&name=Y` — Search (public, no breed search by design)
-- `GET /cats/{id}` — Detail with images (public)
+- `GET /cats?city=X&name=Y` — Search (public; excludes `Deleted` cats)
+- `GET /cats/{id}` — Detail with images (public; returns **404** for `Deleted` cats)
+- `GET /cats/mine` — Org's own cats (JWT; excludes `Deleted` cats)
 - `POST /cats` — Create profile (JWT)
 - `PUT /cats/{id}` — Update (JWT, owner only)
-- `DELETE /cats/{id}` — Delete with images (JWT, owner only)
+- `DELETE /cats/{id}` — Logical delete (`status → Deleted`, JWT, owner only); returns **409** if any active adoption request exists for this cat
 - `POST /cats/{id}/images` — Upload image
 - `DELETE /cats/{catId}/images/{imageId}` — Delete image
 
@@ -133,7 +136,7 @@ Consumes Kafka events and sends transactional emails via SMTP.
 
 End-to-end adoption workflow. Adopters submit requests and complete screening forms; organizations manage the process, schedule interviews, and record expenses.
 
-**Adoption lifecycle:** `Pending` → `Reviewing` → `Accepted` → `FormCompleted` → `AwaitingPayment` → `Completed` / `Rejected`
+**Adoption lifecycle:** `Pending` → `Reviewing` → `Accepted` → `FormCompleted` → `PaymentPending` → `Completed` / `Rejected` / `PaymentFailed`
 
 **Expenses:** veterinary costs billed to the organization; management fee retained by Kitties.
 
@@ -145,12 +148,14 @@ End-to-end adoption workflow. Adopters submit requests and complete screening fo
 | `GET` | `/adoptions/{id}` | Any (JWT) | Caller must be adopter **or** organization of that request |
 | `GET` | `/adoptions/my` | `User` | My requests as adopter |
 | `GET` | `/adoptions/organization` | `Organization` | Requests for my organization |
-| `PATCH` | `/adoptions/{id}/status` | `Organization` | Update status; org owner only |
-| `POST` | `/adoptions/{id}/form` | `User` | Submit screening form |
-| `POST` | `/adoptions/{id}/interview` | `Organization` | Schedule interview |
-| `POST` | `/adoptions/{id}/adoption-form` | `User` | Submit legal contract |
+| `PATCH` | `/adoptions/{id}/status` | `Organization` | Update status; org owner only; returns **409** if cat is deleted and new status is non-terminal |
+| `POST` | `/adoptions/{id}/form` | `User` | Submit screening form (`Pending → Reviewing`); returns **409** if cat is deleted |
+| `POST` | `/adoptions/{id}/interview` | `Organization` | Schedule interview; returns **409** if cat is deleted |
+| `POST` | `/adoptions/{id}/adoption-form` | `User` | Submit legal contract; returns **409** if cat is deleted |
 
 Roles are enforced via `@RolesAllowed` (SmallRye JWT `groups` claim). Ownership is verified at the service layer; mismatches return **403**.
+
+All mutation endpoints verify the cat is still active (not `Deleted`) via `cat-service` before writing state. Terminal transitions (`Rejected`, `Completed`) are exempt — they must always succeed to allow cleanup.
 
 **Kafka topics:**
 - `adoption-form-submitted` (outgoing) — screening form data for analysis
@@ -438,13 +443,13 @@ Unit tests use plain Mockito (`@ExtendWith(MockitoExtension.class)`), no contain
 | storage-service       | 9    | 3           | Real MinIO via `QuarkusTestResourceLifecycleManager` |
 | gateway-service       | 2    | 23          | WireMock 1.6.1 DevService; Mockito para unit tests   |
 | notification-service  | 3    | 2           | MockMailbox + in-memory Kafka + Awaitility           |
-| adoption-service      | 28   | 19          | RBAC + ownership; intake flow + rejection alternatives |
+| adoption-service      | 19   | 23          | RBAC + ownership; intake flow + rejection alternatives; deleted-cat guard |
 | form-analysis-service | 8    | 3           | Rules engine + in-memory Kafka                       |
 | organization-service  | 16   | 17          | Plan-based member limits; @TestSecurity RBAC; @InternalOnly by-region |
 | chat-service          | 17   | 16          | Conversations, messages, ban, internal create        |
 | gateway-service       | 2    | 26          | + internal path 404 + chat routing                   |
 
-**Total: ~225 tests**
+**Total: ~216 tests**
 
 **End-to-end tests** run against the full live stack (all services + Docker infra):
 
@@ -490,6 +495,17 @@ All services use `PanacheRepository` (not Active Record). Repository interfaces 
 ### No JPA relations
 
 Entities do not use `@OneToMany` / `@ManyToOne`. Cross-entity joins are resolved explicitly in the service layer.
+
+### Cross-service referential integrity
+
+There are no database foreign keys between services. Referential integrity is enforced at the application layer in both directions:
+
+- **Before deleting a cat** — `cat-service` calls `GET /adoptions/internal/cats/{id}/active` (internal HTTP). If any non-terminal adoption request exists, the delete is blocked with **409**.
+- **Before mutating an adoption** — `adoption-service` calls `GET /cats/{id}` for every state-transition write. If the cat is `Deleted` (404), the operation fails with **409**.
+
+The two guards together close the invariant: a cat cannot be deleted while adoptions are in flight, and in-flight adoptions cannot advance once the cat is gone. Terminal transitions (`Rejected`, `Completed`) skip the cat check — they must always be allowed to drain state cleanly.
+
+Future: when a user or organisation is deactivated, `user-service` / `organization-service` will emit a Kafka event (`user-deactivated`, `organization-deactivated`) and `adoption-service` will cancel their active requests.
 
 ### Value Objects
 
