@@ -328,14 +328,14 @@ class CatE2E {
     }
 
     @Test @Order(21)
-    void findMine_afterDelete_showsDeletedCatWithStatus() {
+    void findMine_afterDelete_excludesDeletedCat() {
         given()
             .header("Authorization", "Bearer " + ownerOrgToken)
         .when()
             .get("/api/cats/mine")
         .then()
             .statusCode(200)
-            .body("find { it.id == " + catId + " }.status", equalTo("Deleted"));
+            .body("id", not(hasItem(catId.intValue())));
     }
 
     // --- DELETE /cats/{id} blocked when active adoption exists ---

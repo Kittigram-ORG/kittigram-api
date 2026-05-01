@@ -141,20 +141,15 @@ class CatServiceTest {
     // — those scenarios are fully covered in CatResourceTest (integration) and CatE2E
 
     @Test
-    void findMine_returnsAllOrgCatsIncludingDeleted() {
-        Cat deletedCat = new Cat();
-        deletedCat.id = 2L;
-        deletedCat.organizationId = 10L;
-        deletedCat.status = CatStatus.Deleted;
-
+    void findMine_excludesDeletedCats() {
         when(catRepository.findByOrganizationId(10L))
-                .thenReturn(Uni.createFrom().item(List.of(testCat, deletedCat)));
-        when(catMapper.toSummaryResponse(any(Cat.class)))
+                .thenReturn(Uni.createFrom().item(List.of(testCat)));
+        when(catMapper.toSummaryResponse(testCat))
                 .thenReturn(testCatSummaryResponse);
 
         var result = catService.findMine(10L).await().indefinitely();
 
-        assertEquals(2, result.size());
+        assertEquals(1, result.size());
         verify(catRepository).findByOrganizationId(10L);
     }
 

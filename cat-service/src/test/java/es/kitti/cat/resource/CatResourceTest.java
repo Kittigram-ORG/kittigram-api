@@ -229,7 +229,7 @@ class CatResourceTest {
             @Claim(key = "sub", value = "1"),
             @Claim(key = "email", value = "test@kitti.es")
     })
-    void testFindMine_includesDeletedCats() {
+    void testFindMine_excludesDeletedCats() {
         Long catId = given()
                 .contentType(ContentType.JSON)
                 .body("""
@@ -259,6 +259,6 @@ class CatResourceTest {
                 .get("/cats/mine")
                 .then()
                 .statusCode(200)
-                .body("find { it.id == " + catId + " }.status", equalTo("Deleted"));
+                .body("id", not(hasItem(catId.intValue())));
     }
 }
