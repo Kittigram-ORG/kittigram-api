@@ -96,7 +96,7 @@ OpenTelemetry captura atributos HTTP. Una petición a `GET /users/email@example.
 
 Incumplimientos que la AEPD considera graves y que pueden generar sanción antes del primer dato de usuario real.
 
-### C-1 — DNI/NIE almacenado en texto plano
+### C-1 — DNI/NIE almacenado en texto plano ✅ resuelto
 
 **Afecta a:** `adoption.adoption_forms.id_number`
 **Riesgo:** Una brecha de la base de datos expone directamente el documento de identidad de todos los adoptantes.
@@ -113,11 +113,22 @@ Incumplimientos que la AEPD considera graves y que pueden generar sanción antes
 
 **Afecta a:** todos los servicios
 **Riesgo:** Un usuario puede exigir legalmente el borrado de sus datos. El borrado lógico actual (`status → Inactive`) no satisface este derecho — los datos permanecen en BD indefinidamente.
-**Solución:**
-- `user-service`: implementar borrado físico de la fila o anonimización irreversible de todos los campos de identificación personal.
-- `adoption-service`: anonimizar `adopter_email`, `full_name`, `id_number`, `phone`, `address` en los formularios asociados.
-- `auth-service`: revocar y eliminar todos los refresh tokens del usuario.
-- `chat-service`: anonimizar el `sender_id` de sus mensajes (conservar el historial de la org, borrar la identidad del remitente).
+**Solución pendiente de diseño:**
+- `user-service`: borrado físico de la fila + revocar tokens.
+- `adoption-service`: los expedientes de adopción deben conservarse para retención legal (5 años, art. 1964 CC) → los campos PII se anonimizarían irreversiblemente, preservando la estructura del expediente para la organización.
+- `auth-service`: revocar y eliminar todos los refresh tokens.
+- `chat-service`: anonimizar `sender_id` (conservar historial de la org).
+
+**Opciones de implementación en evaluación:**
+- *Anonimización directa*: sobreescribir campos PII con valores nulos o placeholders irreversibles en el momento del borrado.
+- *Crypto-shredding*: cifrar todos los campos PII por usuario con una clave individual; el borrado consiste en destruir esa clave. Más complejo (requiere gestión de claves por usuario) pero resuelve C-3 y C-4 simultáneamente sin complicar retenciones.
+
+**⚠ Apunte de diseño — legal hold (Art. 17.3.e RGPD):**
+El derecho al olvido no es absoluto. Si los datos de un usuario son necesarios como prueba en un procedimiento penal o civil (abuso animal, fraude, etc.), el art. 17.3.e permite denegar la solicitud de borrado mientras dure el procedimiento. Se debe implementar un mecanismo de **legal hold**:
+- Campo `legal_hold_until: TIMESTAMPTZ` (o flag booleano) en `users.users`.
+- Solo activable por un administrador de la plataforma (o por integración con requerimiento judicial).
+- Mientras esté activo, cualquier solicitud de borrado devuelve 409 con texto legal explícito.
+- El hold expira automáticamente o se levanta manualmente al concluir el procedimiento.
 
 ### C-4 — Sin política de retención de datos (Art. 5.1.e RGPD)
 
