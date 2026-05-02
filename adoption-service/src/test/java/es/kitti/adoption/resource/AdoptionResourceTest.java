@@ -1,6 +1,5 @@
 package es.kitti.adoption.resource;
 
-import io.quarkus.hibernate.reactive.panache.Panache;
 import io.quarkus.test.InjectMock;
 import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
@@ -10,11 +9,8 @@ import io.quarkus.test.security.jwt.JwtSecurity;
 import io.restassured.http.ContentType;
 import io.smallrye.mutiny.Uni;
 import io.smallrye.reactive.messaging.memory.InMemoryConnector;
-import jakarta.inject.Inject;
 import jakarta.ws.rs.core.Response;
 import es.kitti.adoption.client.CatClient;
-import es.kitti.adoption.entity.AdoptionRequest;
-import es.kitti.adoption.repository.AdoptionRequestRepository;
 import es.kitti.adoption.test.KafkaTestResource;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,9 +28,6 @@ class AdoptionResourceTest {
     @InjectMock
     @RestClient
     CatClient catClient;
-
-    @Inject
-    AdoptionRequestRepository adoptionRequestRepository;
 
     @BeforeEach
     void mockCatClient() {
@@ -217,7 +210,8 @@ class AdoptionResourceTest {
                 "understandsLongTermCommitment": true,
                 "hasVetBudget": true,
                 "allHouseholdMembersAgree": true,
-                "anyoneHasAllergies": false
+                "anyoneHasAllergies": false,
+                "idNumber": "12345678A"
             }
             """)
                 .when()
@@ -296,7 +290,8 @@ class AdoptionResourceTest {
                     "understandsLongTermCommitment": true,
                     "hasVetBudget": true,
                     "allHouseholdMembersAgree": true,
-                    "anyoneHasAllergies": false
+                    "anyoneHasAllergies": false,
+                    "idNumber": "12345678A"
                 }
                 """)
                 .when()
@@ -306,19 +301,22 @@ class AdoptionResourceTest {
     }
 
     @Test
-    @TestSecurity(user = "2", roles = "Organization")
+    @TestSecurity(user = "2", roles = {"User", "Organization"})
     @JwtSecurity(claims = {
             @Claim(key = "sub", value = "2"),
             @Claim(key = "email", value = "org@kitti.es")
     })
     void testUpdateStatus_catDeleted_returns409() {
-        AdoptionRequest adoption = new AdoptionRequest();
-        adoption.catId = 55L;
-        adoption.adopterId = 1L;
-        adoption.organizationId = 2L;
-        adoption.adopterEmail = "adopter@kitti.es";
-        AdoptionRequest saved = Panache.withTransaction(() -> adoptionRequestRepository.persist(adoption))
-                .await().indefinitely();
+        Integer adoptionId = given()
+                .contentType(ContentType.JSON)
+                .body("""
+                { "catId": 55, "organizationId": 2 }
+                """)
+                .when()
+                .post("/adoptions")
+                .then()
+                .statusCode(201)
+                .extract().path("id");
 
         when(catClient.findById(55L))
                 .thenReturn(Uni.createFrom().item(Response.status(404).build()));
@@ -329,25 +327,28 @@ class AdoptionResourceTest {
                 { "status": "Accepted", "reason": null }
                 """)
                 .when()
-                .patch("/adoptions/" + saved.id + "/status")
+                .patch("/adoptions/" + adoptionId + "/status")
                 .then()
                 .statusCode(409);
     }
 
     @Test
-    @TestSecurity(user = "2", roles = "Organization")
+    @TestSecurity(user = "2", roles = {"User", "Organization"})
     @JwtSecurity(claims = {
             @Claim(key = "sub", value = "2"),
             @Claim(key = "email", value = "org@kitti.es")
     })
     void testUpdateStatus_rejected_catDeleted_returns200() {
-        AdoptionRequest adoption = new AdoptionRequest();
-        adoption.catId = 56L;
-        adoption.adopterId = 1L;
-        adoption.organizationId = 2L;
-        adoption.adopterEmail = "adopter@kitti.es";
-        AdoptionRequest saved = Panache.withTransaction(() -> adoptionRequestRepository.persist(adoption))
-                .await().indefinitely();
+        Integer adoptionId = given()
+                .contentType(ContentType.JSON)
+                .body("""
+                { "catId": 56, "organizationId": 2 }
+                """)
+                .when()
+                .post("/adoptions")
+                .then()
+                .statusCode(201)
+                .extract().path("id");
 
         when(catClient.findById(56L))
                 .thenReturn(Uni.createFrom().item(Response.status(404).build()));
@@ -358,7 +359,7 @@ class AdoptionResourceTest {
                 { "status": "Rejected", "reason": "Cat no longer available" }
                 """)
                 .when()
-                .patch("/adoptions/" + saved.id + "/status")
+                .patch("/adoptions/" + adoptionId + "/status")
                 .then()
                 .statusCode(200)
                 .body("status", equalTo("Rejected"));
