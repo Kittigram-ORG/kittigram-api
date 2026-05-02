@@ -2,7 +2,9 @@ name: CI / CD
 
 on:
   push:
-    branches: [main]
+    branches:
+      - 'production/release/**'
+      - 'production/hotfix/**'
   pull_request:
     branches: [main]
 
@@ -74,7 +76,7 @@ jobs:
     name: Push (${{ matrix.service }})
     needs: [changes, test]
     if: >-
-      github.ref == 'refs/heads/main' &&
+      startsWith(github.ref, 'refs/heads/production/') &&
       github.event_name == 'push' &&
       needs.test.result == 'success'
     runs-on: ubuntu-latest
@@ -106,7 +108,7 @@ jobs:
     name: Deploy to production
     needs: deploy
     if: >-
-      github.ref == 'refs/heads/main' &&
+      startsWith(github.ref, 'refs/heads/production/') &&
       github.event_name == 'push' &&
       needs.deploy.result == 'success'
     runs-on: ubuntu-latest
