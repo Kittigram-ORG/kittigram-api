@@ -103,11 +103,11 @@ Incumplimientos que la AEPD considera graves y que pueden generar sanción antes
 **Base legal:** LOPDGDD art. 9; Circular 1/2019 AEPD sobre tratamiento de datos de identificación personal.
 **Solución:** Cifrado a nivel de aplicación (AES-256-GCM) antes de persistir. La clave de cifrado no debe almacenarse en la BD ni en el código — inyectarla vía variable de entorno / secreto Docker.
 
-### C-2 — Datos de salud sin base legal específica ni consentimiento explícito
+### C-2 — Datos de salud sin base legal específica ni consentimiento explícito ✅ resuelto
 
 **Afecta a:** `anyone_has_allergies`, `allergies_detail` en `adoption_request_forms`
 **Riesgo:** Los datos de salud son categoría especial (Art. 9 RGPD). El `acceptsTermsAndConditions` actual no es un consentimiento explícito para esta categoría.
-**Solución:** Añadir un campo de consentimiento separado (`consentHealthData: boolean`) en el formulario y en la BD, con texto explícito que mencione el tratamiento de datos de salud. Alternativamente, eliminar los campos de alergia si no son imprescindibles para la decisión de adopción (minimización).
+**Solución implementada:** Campo `consent_health_data BOOLEAN NOT NULL` añadido a `adoption_forms` (V4) con consentimiento separado y explícito. El campo `consentHealthData: true` es obligatorio (`@NotNull`) al enviar el formulario de adopción. Los registros anteriores a la migración quedan con `false` y deberán re-enviarse.
 
 ### C-3 — Derecho al olvido no implementado (Art. 17 RGPD)
 
@@ -195,7 +195,7 @@ En producción las imágenes se alojan en Cloudflare R2. Las imágenes de gatos 
 | # | Problema | Servicio(s) afectado(s) | Esfuerzo | Prioridad |
 |---|---|---|---|---|
 | C-1 | Cifrar DNI/NIE | adoption-service | medio | 🔴 crítico |
-| C-2 | Consentimiento explícito datos de salud | adoption-service + frontend | bajo | 🔴 crítico |
+| C-2 | Consentimiento explícito datos de salud | adoption-service + frontend | bajo | ✅ resuelto (backend) |
 | C-3 | Derecho al olvido (borrado/anonimización) | user, adoption, auth, chat | alto | 🔴 crítico |
 | C-4 | Política de retención + jobs de purga | auth, adoption, chat | medio | 🔴 crítico |
 | I-1 | Quitar datos personales del evento Kafka | adoption, form-analysis | bajo | 🟠 importante |

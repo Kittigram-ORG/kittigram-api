@@ -14,5 +14,6 @@ public record AdoptionFormCreateRequest(
         @NotNull Boolean acceptsFollowUpContact,
         @NotNull Boolean acceptsReturnIfNeeded,
         @NotNull Boolean acceptsTermsAndConditions,
+        @NotNull Boolean consentHealthData,
         String additionalNotes
 ) {}

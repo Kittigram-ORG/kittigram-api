@@ -211,6 +211,7 @@ class AdoptionResourceTest {
                 "hasVetBudget": true,
                 "allHouseholdMembersAgree": true,
                 "anyoneHasAllergies": false,
+                "consentHealthData": true,
                 "idNumber": "12345678A"
             }
             """)

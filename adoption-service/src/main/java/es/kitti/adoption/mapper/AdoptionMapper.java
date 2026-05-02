@@ -145,6 +145,7 @@ public class AdoptionMapper {
         entity.acceptsFollowUpContact = request.acceptsFollowUpContact();
         entity.acceptsReturnIfNeeded = request.acceptsReturnIfNeeded();
         entity.acceptsTermsAndConditions = request.acceptsTermsAndConditions();
+        entity.consentHealthData = request.consentHealthData();
         entity.additionalNotes = request.additionalNotes();
         entity.signedAdoptionContract = false;
         return entity;
@@ -164,6 +165,7 @@ public class AdoptionMapper {
                 entity.acceptsFollowUpContact,
                 entity.acceptsReturnIfNeeded,
                 entity.acceptsTermsAndConditions,
+                entity.consentHealthData,
                 entity.additionalNotes,
                 entity.signedAdoptionContract,
                 entity.contractSignedAt,

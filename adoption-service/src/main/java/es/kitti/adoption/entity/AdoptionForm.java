@@ -42,6 +42,9 @@ public class AdoptionForm extends PanacheEntity {
     @Column(nullable = false)
     public Boolean acceptsTermsAndConditions;
 
+    @Column(nullable = false)
+    public Boolean consentHealthData;
+
     @Column(columnDefinition = "TEXT")
     public String additionalNotes;
 

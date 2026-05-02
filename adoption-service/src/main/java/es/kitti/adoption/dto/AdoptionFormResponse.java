@@ -15,6 +15,7 @@ public record AdoptionFormResponse(
         Boolean acceptsFollowUpContact,
         Boolean acceptsReturnIfNeeded,
         Boolean acceptsTermsAndConditions,
+        Boolean consentHealthData,
         String additionalNotes,
         Boolean signedAdoptionContract,
         LocalDateTime contractSignedAt,
