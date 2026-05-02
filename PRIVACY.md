@@ -146,6 +146,25 @@ día 30 sin hold activo → job nocturno ejecuta la anonimización definitiva
 
 Si el requerimiento llega tras ejecutarse la purga, la plataforma queda protegida porque actuó de buena fe cumpliendo el art. 17 sin notificación previa de retención. Las autoridades disponen de 30 días de margen razonable desde la solicitud del usuario. Este patrón es el estándar de facto en grandes plataformas (Google, Meta, etc.).
 
+**⚠ Apunte de diseño — registro inmutable de solicitudes de borrado (Art. 5.2 RGPD):**
+La solicitud de borrado en sí debe persistirse como registro de auditoría, independientemente de si se ejecuta o es bloqueada por un legal hold. En una investigación penal, el momento exacto en que alguien pidió borrar sus datos puede ser evidencia relevante. El registro no contiene PII — solo identificadores y timestamps, que no son datos personales una vez anonimizado el usuario:
+
+```sql
+-- esquema audit (separado de los datos de usuario)
+CREATE TABLE audit.erasure_requests (
+    id                  BIGSERIAL PRIMARY KEY,
+    user_id             BIGINT       NOT NULL,   -- sobrevive al borrado del usuario
+    requested_at        TIMESTAMPTZ  NOT NULL,
+    requested_ip        INET,                    -- IP de la petición
+    scheduled_purge_at  TIMESTAMPTZ  NOT NULL,
+    purged_at           TIMESTAMPTZ,             -- NULL hasta ejecución
+    blocked_by_hold     BOOLEAN      DEFAULT false,
+    hold_lifted_at      TIMESTAMPTZ
+);
+```
+
+Este registro es **append-only e inmutable** — ni el usuario ni un admin pueden eliminarlo. Sirve simultáneamente como prueba de cumplimiento ante la AEPD (accountability, art. 5.2) y como evidencia forense en caso de investigación.
+
 ### C-4 — Sin política de retención de datos (Art. 5.1.e RGPD)
 
 **Afecta a:** todos los servicios
