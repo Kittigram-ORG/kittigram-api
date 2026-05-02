@@ -120,6 +120,14 @@ public class ChatService {
     }
 
     @WithTransaction
+    public Uni<Void> anonymizeUser(Long userId) {
+        return conversationRepository.anonymizeUser(userId)
+                .chain(() -> messageRepository.anonymizeSender(userId))
+                .chain(() -> blockedRepository.deleteByUserId(userId))
+                .replaceWithVoid();
+    }
+
+    @WithTransaction
     public Uni<Void> unblockUser(Long conversationId, Long callerOrgId) {
         return loadAndAuthorize(conversationId, callerOrgId, SenderType.Organization)
                 .onItem().transformToUni(c -> blockedRepository.findByOrgAndUser(c.organizationId, c.userId)

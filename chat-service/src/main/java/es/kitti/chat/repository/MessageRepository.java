@@ -13,4 +13,9 @@ public class MessageRepository implements PanacheRepository<Message> {
     public Uni<List<Message>> findByConversationId(Long conversationId) {
         return list("conversationId = ?1 order by createdAt asc", conversationId);
     }
+
+    public Uni<Integer> anonymizeSender(Long userId) {
+        return update("senderId = 0L where senderId = ?1 and senderType = ?2",
+                userId, es.kitti.chat.entity.SenderType.User);
+    }
 }

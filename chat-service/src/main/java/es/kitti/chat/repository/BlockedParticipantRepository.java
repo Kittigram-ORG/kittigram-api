@@ -16,4 +16,8 @@ public class BlockedParticipantRepository implements PanacheRepository<BlockedPa
         return count("organizationId = ?1 and userId = ?2", organizationId, userId)
                 .onItem().transform(c -> c > 0);
     }
+
+    public Uni<Long> deleteByUserId(Long userId) {
+        return delete("userId", userId);
+    }
 }

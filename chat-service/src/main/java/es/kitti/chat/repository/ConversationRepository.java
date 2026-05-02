@@ -22,4 +22,8 @@ public class ConversationRepository implements PanacheRepository<Conversation> {
     public Uni<Conversation> findByIntakeRequestId(Long intakeRequestId) {
         return find("intakeRequestId", intakeRequestId).firstResult();
     }
+
+    public Uni<Integer> anonymizeUser(Long userId) {
+        return update("userId = 0L where userId = ?1", userId);
+    }
 }
