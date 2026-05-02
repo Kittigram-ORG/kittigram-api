@@ -364,6 +364,27 @@ done
 
 On Windows, run the commands above in Git Bash or WSL. To install OpenSSL via winget: `winget install ShiningLight.OpenSSL`.
 
+### ID number encryption key
+
+`adoption-service` stores DNI/NIE values encrypted with AES-256-GCM (LOPDGDD art. 9 / C-1). The key must be a Base64-encoded 32-byte secret injected via `KITTIES_ID_NUMBER_KEY`. It is never stored in the database or in source code.
+
+```bash
+# Generate a 256-bit key (do this once and store securely)
+openssl rand -base64 32
+```
+
+In **development** the service falls back to a hardcoded dev-only key — no action required. In **production** the key must be supplied as a Docker Secret or environment variable:
+
+```bash
+# Docker Secret (recommended)
+echo "$(openssl rand -base64 32)" | docker secret create kitties_id_number_key -
+
+# Or via environment variable in .env
+KITTIES_ID_NUMBER_KEY=<output of openssl rand -base64 32>
+```
+
+> **Key rotation**: to rotate the key you must re-encrypt all existing `adoption_forms.id_number` rows before deploying the new key. There is no automatic migration — coordinate with a maintenance window.
+
 ### gRPC internal secret
 
 `auth-service` and `user-service` communicate over gRPC protected by a shared secret injected as the `x-internal-token` header. Set `GRPC_INTERNAL_SECRET` in your `.env` (required in production; defaults to `kitties-dev-secret` in dev).
@@ -572,6 +593,7 @@ Copy `.env.example` to `.env` and fill in all values. Variables marked **require
 |-----------------------------|-------------------------------------|----------------------------------------|
 | `JWT_PRIVATE_KEY_LOCATION`  | `/run/secrets/privateKey.pem`       | RSA private key path (auth-service)    |
 | `JWT_PUBLIC_KEY_LOCATION`   | `/run/secrets/publicKey.pem`        | RSA public key path (all other services) |
+| `KITTIES_ID_NUMBER_KEY`     | —                                   | AES-256-GCM key for DNI/NIE encryption (Base64, 32 bytes). **Required in prod.** Generate with `openssl rand -base64 32`. |
 
 **Dev tools:**
 
@@ -652,6 +674,7 @@ These features make the portal self-sustaining without depending solely on shelt
 - [x] JWT keys externalized in `%prod` profile (mounted secrets, not classpath)
 - [x] MIME magic byte validation on upload — rejects files whose bytes don't match declared Content-Type (JPEG/PNG spoofing prevention)
 - [x] `X-Content-Type-Options: nosniff` injected on all gateway responses (MIME sniffing prevention)
+- [x] **DNI/NIE encrypted at rest** — `adoption_forms.id_number` stored as AES-256-GCM ciphertext; key injected via `KITTIES_ID_NUMBER_KEY` env var / Docker Secret (LOPDGDD art. 9, C-1)
 - [ ] **Fix `IpRateLimiter` cross-endpoint bucket sharing** — refresh and upload (IP key) share the same `Deque<Long>`; two uploads consume from the same window as two refreshes for the same IP.
 - [ ] Rate limiting distributed with Redis — current limit is per JVM instance; multi-replica deployments multiply the effective limit.
 - [ ] Activation token expiry (`activationTokenExpiresAt`)

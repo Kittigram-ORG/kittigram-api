@@ -1,11 +1,16 @@
 package es.kitti.adoption.mapper;
 
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 import es.kitti.adoption.dto.*;
 import es.kitti.adoption.entity.*;
+import es.kitti.adoption.security.IdNumberEncryptionService;
 
 @ApplicationScoped
 public class AdoptionMapper {
+
+    @Inject
+    IdNumberEncryptionService encryptionService;
 
     public AdoptionRequest toEntity(AdoptionRequestCreateRequest request, Long adopterId, String adopterEmail) {
         AdoptionRequest entity = new AdoptionRequest();
@@ -131,7 +136,7 @@ public class AdoptionMapper {
         AdoptionForm entity = new AdoptionForm();
         entity.adoptionRequestId = adoptionRequestId;
         entity.fullName = request.fullName();
-        entity.idNumber = request.idNumber();
+        entity.idNumber = encryptionService.encrypt(request.idNumber());
         entity.phone = request.phone();
         entity.address = request.address();
         entity.city = request.city();
@@ -150,7 +155,7 @@ public class AdoptionMapper {
                 entity.id,
                 entity.adoptionRequestId,
                 entity.fullName,
-                entity.idNumber,
+                encryptionService.decrypt(entity.idNumber),
                 entity.phone,
                 entity.address,
                 entity.city,
